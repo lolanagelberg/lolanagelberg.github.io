@@ -1,1 +1,969 @@
- <h1>hello world</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Probe Controller</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #f0f0f0;
+        }
+        
+        h1, h2 {
+            text-align: center;
+        }
+        
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .api-info {
+            background-color: #e9f7fe;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .position-display {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        
+        .position-card {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            width: 30%;
+        }
+        
+        .position-card h3 {
+            margin-top: 0;
+            font-size: 16px;
+        }
+        
+        .position-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin: 10px 0;
+        }
+        
+        .button-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .button-panel button {
+            padding: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+        }
+        
+        .button-panel button:hover {
+            background-color: #45a049;
+            transform: scale(1.05);
+        }
+        
+        .button-panel button:active {
+            background-color: #ff4757;
+            transform: scale(0.98);
+        }
+        
+        #up {
+            grid-column: 2;
+            grid-row: 1;
+        }
+        
+        #left {
+            grid-column: 1;
+            grid-row: 2;
+        }
+        
+        #center {
+            grid-column: 2;
+            grid-row: 2;
+            background-color: #6c757d;
+        }
+        
+        #right {
+            grid-column: 3;
+            grid-row: 2;
+        }
+        
+        #down {
+            grid-column: 2;
+            grid-row: 3;
+        }
+        
+        #forward, #backward {
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            flex: 1;
+            transition: all 0.2s ease;
+        }
+        
+        #forward:hover, #backward:hover {
+            background-color: #0b7dda;
+            transform: scale(1.05);
+        }
+        
+        #forward:active, #backward:active {
+            background-color: #ff4757;
+            transform: scale(0.98);
+        }
+        
+        .z-buttons {
+            display: flex;
+            justify-content: center;
+        }
+        
+        .increment-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+            justify-content: center;
+        }
+        
+        .increment-control input {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .increment-control label {
+            font-weight: bold;
+        }
+        
+        .visualization {
+            width: 100%;
+            height: 300px;
+            background-color: #eee;
+            position: relative;
+            overflow: hidden;
+            border-radius: 5px;
+            margin: 20px 0;
+            perspective: 800px;
+        }
+        
+        .probe {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: #ff4757;
+            border-radius: 50%;
+            transform-style: preserve-3d;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+        
+        .floor {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background-color: #999;
+            transform: rotateX(60deg);
+            transform-origin: bottom;
+        }
+        
+        .grid {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(255,255,255,0) 0%, rgba(0,0,0,0.1) 100%);
+            background-size: 40px 40px;
+            background-image:
+                linear-gradient(to right, #ddd 1px, transparent 1px),
+                linear-gradient(to bottom, #ddd 1px, transparent 1px);
+            transform: rotateX(60deg);
+            transform-origin: bottom;
+        }
+        
+        .axis {
+            position: absolute;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .x-axis {
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+        }
+        
+        .y-axis {
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+        }
+        
+        .z-axis {
+            bottom: 20px;
+            left: 50%;
+            width: 2px;
+            height: 100px;
+            transform: rotateX(-30deg);
+            transform-origin: bottom;
+        }
+        
+        .axis-label {
+            position: absolute;
+            font-weight: bold;
+            font-size: 12px;
+            color: #333;
+        }
+        
+        .x-label {
+            bottom: 5px;
+            right: 10px;
+        }
+        
+        .y-label {
+            top: 10px;
+            left: 52%;
+        }
+        
+        .z-label {
+            bottom: 100px;
+            left: 52%;
+        }
+        
+        .history {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            height: 200px;
+            overflow-y: auto;
+        }
+        
+        .history h3 {
+            margin-top: 0;
+            font-size: 16px;
+        }
+        
+        .history-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+            font-family: monospace;
+        }
+        
+        .success {
+            color: #28a745;
+        }
+        
+        .error {
+            color: #dc3545;
+        }
+        
+        .keyboard-shortcuts {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        
+        .keyboard-shortcuts h3 {
+            margin-top: 0;
+            font-size: 16px;
+        }
+        
+        .shortcuts-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 10px;
+        }
+        
+        .shortcut {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        kbd {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+            color: #333;
+            display: inline-block;
+            font-size: 12px;
+            line-height: 1;
+            padding: 5px;
+            margin: 0 5px;
+        }
+        
+        .api-controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .api-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        
+        .status-online {
+            background-color: #28a745;
+        }
+        
+        .status-offline {
+            background-color: #dc3545;
+        }
+        
+        .status-text {
+            font-weight: bold;
+        }
+        
+        .find-objects-btn {
+            padding: 8px 12px;
+            background-color: #17a2b8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .find-objects-btn:hover {
+            background-color: #138496;
+        }
+        
+        .object-selector {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .object-selector select {
+            flex: 1;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>3D Probe Controller</h1>
+    
+    <div class="api-info">
+        Connected to API: <span id="api-endpoint">https://cwruxrgateway.azurewebsites.net/api/v4/Object</span>
+    </div>
+    
+    <div class="container">
+        <div class="api-controls">
+            <div class="api-toggle">
+                <span class="status-text">API Control: </span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="apiToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button id="findObjects" class="find-objects-btn">Find Objects</button>
+            <div>
+                <span class="status-indicator" id="apiStatus"></span>
+                <span id="apiStatusText">Checking connection...</span>
+            </div>
+        </div>
+        
+        <div class="object-selector">
+            <label for="objectSelect">Selected Object:</label>
+            <select id="objectSelect">
+                <option value="default">Default Target Object</option>
+            </select>
+        </div>
+        
+        <div class="visualization">
+            <div class="grid"></div>
+            <div class="floor"></div>
+            <div class="probe" id="probe"></div>
+            <div class="axis x-axis"></div>
+            <div class="axis y-axis"></div>
+            <div class="axis z-axis"></div>
+            <div class="axis-label x-label">X</div>
+            <div class="axis-label y-label">Y</div>
+            <div class="axis-label z-label">Z</div>
+        </div>
+        
+        <div class="position-display">
+            <div class="position-card">
+                <h3>X Position</h3>
+                <div class="position-value" id="xPosition">0.000</div>
+            </div>
+            <div class="position-card">
+                <h3>Y Position</h3>
+                <div class="position-value" id="yPosition">0.000</div>
+            </div>
+            <div class="position-card">
+                <h3>Z Position</h3>
+                <div class="position-value" id="zPosition">0.000</div>
+            </div>
+        </div>
+        
+        <div class="increment-control">
+            <label for="increment">Movement Increment:</label>
+            <input type="number" id="increment" value="0.01" step="0.001" min="0.001" max="1">
+        </div>
+        
+        <h2>Movement Controls</h2>
+        
+        <div class="button-panel">
+            <button id="up">UP (Y+)</button>
+            <button id="left">LEFT (X-)</button>
+            <button id="center">RESET</button>
+            <button id="right">RIGHT (X+)</button>
+            <button id="down">DOWN (Y-)</button>
+        </div>
+        
+        <div class="z-buttons">
+            <button id="forward">FORWARD (Z+)</button>
+            <button id="backward">BACKWARD (Z-)</button>
+        </div>
+        
+        <div class="keyboard-shortcuts">
+            <h3>Keyboard Shortcuts</h3>
+            <div class="shortcuts-grid">
+                <div class="shortcut"><span>Move Up (Y+)</span> <kbd>↑</kbd></div>
+                <div class="shortcut"><span>Move Down (Y-)</span> <kbd>↓</kbd></div>
+                <div class="shortcut"><span>Move Left (X-)</span> <kbd>←</kbd></div>
+                <div class="shortcut"><span>Move Right (X+)</span> <kbd>→</kbd></div>
+                <div class="shortcut"><span>Move Forward (Z+)</span> <kbd>Page Up</kbd></div>
+                <div class="shortcut"><span>Move Backward (Z-)</span> <kbd>Page Down</kbd></div>
+                <div class="shortcut"><span>Reset Position</span> <kbd>Home</kbd></div>
+            </div>
+        </div>
+        
+        <div class="history">
+            <h3>Movement History</h3>
+            <div id="historyContainer"></div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // API configuration
+            const API_CONFIG = {
+                endpoint: 'https://cwruxrgateway.azurewebsites.net/api/v4/Object',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'ApiKey': '2B06144BF7FF64746EBFBB2C903F59',
+                    'AnchorCode': 'NRWV'
+                },
+                targetObjectSource: 'https://cwruxrdeck.blob.core.windows.net/filecache/c4433760-1861-4882-9c06-0bda81682004.obj'
+            };
+            
+            // Get DOM elements
+            const probe = document.getElementById('probe');
+            const xPosition = document.getElementById('xPosition');
+            const yPosition = document.getElementById('yPosition');
+            const zPosition = document.getElementById('zPosition');
+            const incrementInput = document.getElementById('increment');
+            const historyContainer = document.getElementById('historyContainer');
+            const apiToggle = document.getElementById('apiToggle');
+            const apiStatus = document.getElementById('apiStatus');
+            const apiStatusText = document.getElementById('apiStatusText');
+            const findObjectsBtn = document.getElementById('findObjects');
+            const objectSelect = document.getElementById('objectSelect');
+            
+            // API state
+            let apiConnected = false;
+            let targetObject = null;
+            let allObjects = [];
+            
+            // Current position
+            let position = {
+                x: 0,
+                y: 0,
+                z: 0
+            };
+            
+            // Initial probe position
+            updateProbePosition();
+            
+            // Movement directions
+            const directions = {
+                up: { axis: 'y', value: 1, name: 'UP' },
+                down: { axis: 'y', value: -1, name: 'DOWN' },
+                left: { axis: 'x', value: -1, name: 'LEFT' },
+                right: { axis: 'x', value: 1, name: 'RIGHT' },
+                forward: { axis: 'z', value: 1, name: 'FORWARD' },
+                backward: { axis: 'z', value: -1, name: 'BACKWARD' }
+            };
+            
+            // Add to history
+            function addToHistory(message, type = '') {
+                const now = new Date().toLocaleTimeString();
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                if (type) historyItem.classList.add(type);
+                historyItem.textContent = `[${now}] ${message}`;
+                historyContainer.prepend(historyItem);
+                
+                // Limit history items
+                if (historyContainer.children.length > 50) {
+                    historyContainer.removeChild(historyContainer.lastChild);
+                }
+                
+                console.log(`[${now}] ${message}`);
+            }
+            
+            // Update API status
+            function updateApiStatus(connected, message) {
+                apiConnected = connected;
+                apiStatus.className = 'status-indicator ' + (connected ? 'status-online' : 'status-offline');
+                apiStatusText.textContent = message;
+            }
+            
+            // Update probe position in visualization
+            function updateProbePosition() {
+                // Set position values
+                xPosition.textContent = position.x.toFixed(3);
+                yPosition.textContent = position.y.toFixed(3);
+                zPosition.textContent = position.z.toFixed(3);
+                
+                // Calculate visual position (mapping 3D space to the visualization)
+                const visualX = 50 + position.x * 500; // Center is 50%, multiplier for visual effect
+                const visualY = 50 - position.y * 500; // Inverted Y axis in browser
+                const visualZ = 0 + position.z * 500;  // Z affects size/shadow for 3D effect
+                
+                // Scale based on z position for perspective effect
+                const scale = 1 + position.z * 0.5;
+                
+                // Apply transformations
+                probe.style.left = `${visualX}%`;
+                probe.style.top = `${visualY}%`;
+                probe.style.transform = `translate(-50%, -50%) scale(${scale})`;
+                
+                // Z-index based on Y position to handle overlapping
+                probe.style.zIndex = Math.floor(position.y * 100 + 100);
+                
+                // Adjust shadow based on height
+                const shadowBlur = 5 + Math.abs(position.z) * 10;
+                const shadowY = 5 + position.z * 15;
+                probe.style.boxShadow = `0 ${shadowY}px ${shadowBlur}px rgba(0,0,0,0.2)`;
+            }
+            
+            // Check API connection
+            async function checkApiConnection() {
+                if (!apiToggle.checked) {
+                    updateApiStatus(false, 'API control disabled');
+                    return false;
+                }
+                
+                try {
+                    const response = await fetch(API_CONFIG.endpoint, {
+                        method: 'GET',
+                        headers: API_CONFIG.headers
+                    });
+                    
+                    if (response.ok) {
+                        updateApiStatus(true, 'Connected to API');
+                        return true;
+                    } else {
+                        updateApiStatus(false, `API error: ${response.status}`);
+                        return false;
+                    }
+                } catch (error) {
+                    updateApiStatus(false, `Connection error: ${error.message}`);
+                    return false;
+                }
+            }
+            
+            // Find objects in API
+            async function findObjects() {
+                if (!apiToggle.checked) {
+                    addToHistory('API control is disabled', 'error');
+                    return;
+                }
+                
+                addToHistory('Searching for objects...');
+                
+                try {
+                    const response = await fetch(API_CONFIG.endpoint, {
+                        method: 'GET',
+                        headers: API_CONFIG.headers
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API error: ${response.status}`);
+                    }
+                    
+                    allObjects = await response.json();
+                    
+                    // Clear select options
+                    objectSelect.innerHTML = '';
+                    
+                    // Add default option
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = 'default';
+                    defaultOption.textContent = 'Default Target Object';
+                    objectSelect.appendChild(defaultOption);
+                    
+                    // Find target object by source
+                    const targetObjects = allObjects.filter(obj => 
+                        obj.source === API_CONFIG.targetObjectSource
+                    );
+                    
+                    if (targetObjects.length > 0) {
+                        targetObject = targetObjects[0];
+                        // Update position from target object
+                        if (targetObject.pose && targetObject.pose.position) {
+                            position = {
+                                x: targetObject.pose.position.x,
+                                y: targetObject.pose.position.y,
+                                z: targetObject.pose.position.z
+                            };
+                            updateProbePosition();
+                        }
+                        
+                        addToHistory(`Found target object: ${targetObject.id}`, 'success');
+                        
+                        // Add target object to select
+                        const targetOption = document.createElement('option');
+                        targetOption.value = targetObject.id;
+                        targetOption.textContent = `Target: ${targetObject.id} (${targetObject.type})`;
+                        targetOption.selected = true;
+                        objectSelect.appendChild(targetOption);
+                    } else {
+                        addToHistory('Target object not found', 'error');
+                    }
+                    
+                    // Add other objects to select
+                    allObjects.forEach(obj => {
+                        if (!targetObject || obj.id !== targetObject.id) {
+                            const option = document.createElement('option');
+                            option.value = obj.id;
+                            option.textContent = `${obj.id} (${obj.type})`;
+                            objectSelect.appendChild(option);
+                        }
+                    });
+                    
+                    addToHistory(`Found ${allObjects.length} total objects`);
+                    updateApiStatus(true, `Connected - ${allObjects.length} objects found`);
+                    
+                } catch (error) {
+                    addToHistory(`Error finding objects: ${error.message}`, 'error');
+                    updateApiStatus(false, `Error: ${error.message}`);
+                }
+            }
+            
+            // Move probe via API
+            async function moveProbeViaApi(axis, value) {
+                if (!apiToggle.checked) {
+                    return { success: false, message: 'API control is disabled' };
+                }
+                
+                if (!targetObject) {
+                    return { success: false, message: 'No target object selected' };
+                }
+                
+                try {
+                    // Create a deep copy of the target object
+                    const updatedObject = JSON.parse(JSON.stringify(targetObject));
+                    
+                    // Ensure pose and position objects exist
+                    if (!updatedObject.pose) updatedObject.pose = {};
+                    if (!updatedObject.pose.position) updatedObject.pose.position = { x: 0, y: 0, z: 0 };
+                    
+                    // Update the specific axis
+                    updatedObject.pose.position[axis] = position[axis];
+                    
+                    // Send update to API
+                    const response = await fetch(`${API_CONFIG.endpoint}/${targetObject.id}`, {
+                        method: 'PUT',
+                        headers: API_CONFIG.headers,
+                        body: JSON.stringify(updatedObject)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API error: ${response.status}`);
+                    }
+                    
+                    // Try to parse response
+                    try {
+                        const result = await response.json();
+                        return { success: true, message: 'Position updated via API', data: result };
+                    } catch (parseError) {
+                        return { success: true, message: 'Position updated (no response data)' };
+                    }
+                    
+                } catch (error) {
+                    return { success: false, message: `API error: ${error.message}` };
+                }
+            }
+            
+            // Move probe (with optional API update)
+            async function moveProbe(direction) {
+                const dir = directions[direction];
+                if (!dir) return;
+                
+                // Get increment value
+                const increment = parseFloat(incrementInput.value) || 0.01;
+                
+                // Apply movement to local position
+                position[dir.axis] += dir.value * increment;
+                
+                // Constrain to reasonable range
+                position.x = Math.max(-1, Math.min(1, position.x));
+                position.y = Math.max(-1, Math.min(1, position.y));
+                position.z = Math.max(-1, Math.min(1, position.z));
+                
+                // Update visuals
+                updateProbePosition();
+                
+                // Add to history
+                addToHistory(`Moved ${dir.name}: ${dir.axis.toUpperCase()}${dir.value > 0 ? '+' : ''}${(dir.value * increment).toFixed(3)}`);
+                
+                // Highlight button
+                const button = document.getElementById(direction);
+                if (button) {
+                    button.style.backgroundColor = '#ff4757';
+                    setTimeout(() => {
+                        button.style.backgroundColor = '';
+                    }, 200);
+                }
+                
+                // Update via API if enabled
+                if (apiToggle.checked) {
+                    const result = await moveProbeViaApi(dir.axis, dir.value * increment);
+                    
+                    if (result.success) {
+                        addToHistory(`API update successful: ${result.message}`, 'success');
+                    } else {
+                        addToHistory(`API update failed: ${result.message}`, 'error');
+                    }
+                }
+            }
+            
+            // Reset probe position
+            async function resetProbe() {
+                position = { x: 0, y: 0, z: 0 };
+                updateProbePosition();
+                addToHistory('Position RESET to (0, 0, 0)');
+                
+                // Highlight button
+                const button = document.getElementById('center');
+                if (button) {
+                    button.style.backgroundColor = '#ff4757';
+                    setTimeout(() => {
+                        button.style.backgroundColor = '';
+                    }, 200);
+                }
+                
+                // Reset via API if enabled
+                if (apiToggle.checked && targetObject) {
+                    try {
+                        // Create a deep copy of the target object
+                        const updatedObject = JSON.parse(JSON.stringify(targetObject));
+                        
+                        // Reset position
+                        if (!updatedObject.pose) updatedObject.pose = {};
+                        updatedObject.pose.position = { x: 0, y: 0, z: 0 };
+                        
+                        // Send update to API
+                        const response = await fetch(`${API_CONFIG.endpoint}/${targetObject.id}`, {
+                            method: 'PUT',
+                            headers: API_CONFIG.headers,
+                            body: JSON.stringify(updatedObject)
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`API error: ${response.status}`);
+                        }
+                        
+                        addToHistory('API position reset successful', 'success');
+                        
+                    } catch (error) {
+                        addToHistory(`API reset failed: ${error.message}`, 'error');
+                    }
+                }
+            }
+            
+            // Handle object selection change
+            function handleObjectSelectChange() {
+                const selectedId = objectSelect.value;
+                
+                if (selectedId === 'default') {
+                    // Keep using the default target
+                    return;
+                }
+                
+                // Find the selected object
+                const selected = allObjects.find(obj => obj.id === selectedId);
+                
+                if (selected) {
+                    targetObject = selected;
+                    addToHistory(`Selected object: ${targetObject.id}`);
+                    
+                    // Update position if available
+                    if (targetObject.pose && targetObject.pose.position) {
+                        position = {
+                            x: targetObject.pose.position.x,
+                            y: targetObject.pose.position.y,
+                            z: targetObject.pose.position.z
+                        };
+                        updateProbePosition();
+                        addToHistory('Updated position from selected object');
+                    }
+                }
+            }
+            
+            // Button event listeners
+            Object.keys(directions).forEach(direction => {
+                const button = document.getElementById(direction);
+                if (button) {
+                    button.addEventListener('click', () => moveProbe(direction));
+                }
+            });
+            
+            // Reset button
+            document.getElementById('center').addEventListener('click', resetProbe);
+            
+            // Find objects button
+            findObjectsBtn.addEventListener('click', findObjects);
+            
+            // Object select change
+            objectSelect.addEventListener('change', handleObjectSelectChange);
+            
+            // API toggle
+            apiToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    checkApiConnection();
+                    addToHistory('API control enabled');
+                } else {
+                    updateApiStatus(false, 'API control disabled');
+                    addToHistory('API control disabled');
+                }
+            });
+            
+            // Keyboard controls
+            document.addEventListener('keydown', function(event) {
+                switch(event.key) {
+                    case 'ArrowUp':
+                        moveProbe('up');
+                        break;
+                    case 'ArrowDown':
+                        moveProbe('down');
+                        break;
+                    case 'ArrowLeft':
+                        moveProbe('left');
+                        break;
+                    case 'ArrowRight':
+                        moveProbe('right');
+                        break;
+                    case 'PageUp':
+                        moveProbe('forward');
+                        break;
+                    case 'PageDown':
+                        moveProbe('backward');
+                        break;
+                    case 'Home':
+                        resetProbe();
+                        break;
+                }
+            });
+            
+            // Initialize
+            addToHistory('3D Probe Controller initialized');
+            
+            // Check API connection
+            setTimeout(async () => {
+                const connected = await checkApiConnection();
+                if (connected) {
+                    findObjects();  // Automatically find objects if connected
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>
