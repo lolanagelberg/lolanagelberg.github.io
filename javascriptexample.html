@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaScript Tutorial - Interacting with the Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .tutorial-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        input[type="text"] {
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            margin: 5px;
+        }
+        
+        .output {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+            margin-top: 10px;
+        }
+        
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .color-box {
+            width: 100px;
+            height: 100px;
+            background-color: #e74c3c;
+            border: 2px solid #333;
+            border-radius: 10px;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        #counter-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Interactive JavaScript Tutorial</h1>
+    <p>Learn how JavaScript can interact with web pages through these simple examples!</p>
+
+    <!-- Example 1: Changing Text Content -->
+    <div class="tutorial-section">
+        <h2>1. Changing Text Content</h2>
+        <p>Click the button to change the text below:</p>
+        <p id="text-demo">This text will change when you click the button!</p>
+        <button onclick="changeText()">Change Text</button>
+        
+        <div class="output">
+            <strong>JavaScript Code:</strong><br>
+            <code>function changeText() {<br>
+            &emsp;&emsp;document.getElementById('text-demo').textContent = 'Text changed!';<br>
+            }</code>
+        </div>
+    </div>
+
+    <!-- Example 2: Show/Hide Elements -->
+    <div class="tutorial-section">
+        <h2>2. Show/Hide Elements</h2>
+        <p>Use JavaScript to control element visibility:</p>
+        <div id="hidden-message" class="hidden">
+            🎉 Surprise! You found the hidden message!
+        </div>
+        <button onclick="toggleMessage()">Show/Hide Message</button>
+        
+        <div class="output">
+            <strong>JavaScript Code:</strong><br>
+            <code>function toggleMessage() {<br>
+            &emsp;&emsp;const element = document.getElementById('hidden-message');<br>
+            &emsp;&emsp;element.classList.toggle('hidden');<br>
+            }</code>
+        </div>
+    </div>
+
+    <!-- Example 3: User Input and Greeting -->
+    <div class="tutorial-section">
+        <h2>3. Getting User Input</h2>
+        <p>Enter your name and get a personalized greeting:</p>
+        <input type="text" id="name-input" placeholder="Enter your name">
+        <button onclick="greetUser()">Get Greeting</button>
+        <div id="greeting-output" class="output" style="display: none;">
+            <strong>Greeting will appear here!</strong>
+        </div>
+        
+        <div class="output">
+            <strong>JavaScript Code:</strong><br>
+            <code>function greetUser() {<br>
+            &emsp;&emsp;const name = document.getElementById('name-input').value;<br>
+            &emsp;&emsp;const output = document.getElementById('greeting-output');<br>
+            &emsp;&emsp;output.innerHTML = `Hello, ${name}! Welcome to JavaScript!`;<br>
+            &emsp;&emsp;output.style.display = 'block';<br>
+            }</code>
+        </div>
+    </div>
+
+    <!-- Example 4: Changing Styles -->
+    <div class="tutorial-section">
+        <h2>4. Changing Element Styles</h2>
+        <p>Click buttons to change the color of the box:</p>
+        <div id="color-box" class="color-box"></div>
+        <button onclick="changeColor('blue')">Blue</button>
+        <button onclick="changeColor('green')">Green</button>
+        <button onclick="changeColor('purple')">Purple</button>
+        <button onclick="changeColor('orange')">Orange</button>
+        
+        <div class="output">
+            <strong>JavaScript Code:</strong><br>
+            <code>function changeColor(color) {<br>
+            &emsp;&emsp;document.getElementById('color-box').style.backgroundColor = color;<br>
+            }</code>
+        </div>
+    </div>
+
+    <!-- Example 5: Counter with State -->
+    <div class="tutorial-section">
+        <h2>5. Keeping Track of State</h2>
+        <p>A simple counter that remembers its value:</p>
+        <div id="counter-display">Count: 0</div>
+        <button onclick="incrementCounter()">+1</button>
+        <button onclick="decrementCounter()">-1</button>
+        <button onclick="resetCounter()">Reset</button>
+        
+        <div class="output">
+            <strong>JavaScript Code:</strong><br>
+            <code>let counter = 0;<br>
+            function incrementCounter() {<br>
+            &emsp;&emsp;counter++;<br>
+            &emsp;&emsp;updateCounterDisplay();<br>
+            }<br>
+            function updateCounterDisplay() {<br>
+            &emsp;&emsp;document.getElementById('counter-display').textContent = `Count: ${counter}`;<br>
+            }</code>
+        </div>
+    </div>
+
+    <div class="tutorial-section">
+        <h2>🎓 What You've Learned</h2>
+        <p>Congratulations! You've learned the basic ways JavaScript can interact with web pages:</p>
+        <ul>
+            <li><strong>Finding elements:</strong> Using <code>document.getElementById()</code></li>
+            <li><strong>Changing content:</strong> Using <code>textContent</code> and <code>innerHTML</code></li>
+            <li><strong>Controlling visibility:</strong> Using CSS classes and <code>style.display</code></li>
+            <li><strong>Getting user input:</strong> Using <code>input.value</code></li>
+            <li><strong>Changing styles:</strong> Using <code>element.style</code></li>
+            <li><strong>Managing state:</strong> Using variables to remember values</li>
+        </ul>
+        <p>These are the building blocks of interactive web pages. Keep experimenting and learning!</p>
+    </div>
+
+    <script>
+        // Example 1: Change text content
+        function changeText() {
+            const element = document.getElementById('text-demo');
+            if (element.textContent === 'This text will change when you click the button!') {
+                element.textContent = 'Text changed! Click again to reset.';
+                element.style.color = '#e74c3c';
+            } else {
+                element.textContent = 'This text will change when you click the button!';
+                element.style.color = 'black';
+            }
+        }
+
+        // Example 2: Toggle visibility
+        function toggleMessage() {
+            const element = document.getElementById('hidden-message');
+            element.classList.toggle('hidden');
+        }
+
+        // Example 3: Get user input and display greeting
+        function greetUser() {
+            const name = document.getElementById('name-input').value;
+            const output = document.getElementById('greeting-output');
+            
+            if (name.trim() === '') {
+                output.innerHTML = '<strong>Please enter your name!</strong>';
+                output.style.backgroundColor = '#ffe6e6';
+            } else {
+                output.innerHTML = `<strong>Hello, ${name}! Welcome to JavaScript! 🎉</strong>`;
+                output.style.backgroundColor = '#e6ffe6';
+            }
+            output.style.display = 'block';
+        }
+
+        // Example 4: Change colors
+        function changeColor(color) {
+            document.getElementById('color-box').style.backgroundColor = color;
+        }
+
+        // Example 5: Counter functionality
+        let counter = 0;
+
+        function incrementCounter() {
+            counter++;
+            updateCounterDisplay();
+        }
+
+        function decrementCounter() {
+            counter--;
+            updateCounterDisplay();
+        }
+
+        function resetCounter() {
+            counter = 0;
+            updateCounterDisplay();
+        }
+
+        function updateCounterDisplay() {
+            document.getElementById('counter-display').textContent = `Count: ${counter}`;
+        }
+
+        // Add enter key support for the name input
+        document.getElementById('name-input').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                greetUser();
+            }
+        });
+    </script>
+</body>
+</html>
