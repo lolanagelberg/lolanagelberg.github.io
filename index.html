@@ -435,9 +435,11 @@
 </head>
 <body>
     <h1>3D Probe Controller</h1>
+
+    <input type="text" name="my-textbox" id="my-textbox" placeholder="Enter anchor code here">
     
     <div class="api-info">
-        Connected to API: <span id="api-endpoint">https://cwruxrgateway.azurewebsites.net/api/v4/Object</span>
+        Connect to API: <span id="api-endpoint">https://cwruxrgateway.azurewebsites.net/api/v4/Object</span>
     </div>
     
     <div class="container">
@@ -449,7 +451,7 @@
                     <span class="slider"></span>
                 </label>
             </div>
-            <button id="findObjects" class="find-objects-btn">Find Objects</button>
+            <button id="findObjects" class="find-objects-btn">Find the Objects</button>
             <div>
                 <span class="status-indicator" id="apiStatus"></span>
                 <span id="apiStatusText">Checking connection...</span>
@@ -531,13 +533,17 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+
+            // Get anchor code and put in a variable
+            var anchorCode = document.getElementById('my-textbox').value;
+
             // API configuration
-            const API_CONFIG = {
+            var API_CONFIG = {
                 endpoint: 'https://cwruxrgateway.azurewebsites.net/api/v4/Object',
                 headers: {
                     'Content-Type': 'application/json',
                     'ApiKey': '2B06144BF7FF64746EBFBB2C903F59',
-                    'AnchorCode': 'NRWV'
+                    'AnchorCode': 'NKXC'
                 },
                 targetObjectSource: 'https://cwruxrdeck.blob.core.windows.net/filecache/c4433760-1861-4882-9c06-0bda81682004.obj'
             };
@@ -794,9 +800,9 @@
                 position[dir.axis] += dir.value * increment;
                 
                 // Constrain to reasonable range
-                position.x = Math.max(-1, Math.min(1, position.x));
-                position.y = Math.max(-1, Math.min(1, position.y));
-                position.z = Math.max(-1, Math.min(1, position.z));
+                position.x = Math.max(-5, Math.min(5, position.x));
+                position.y = Math.max(-5, Math.min(5, position.y));
+                position.z = Math.max(-5, Math.min(5, position.z));
                 
                 // Update visuals
                 updateProbePosition();
