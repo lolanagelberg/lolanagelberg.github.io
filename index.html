@@ -533,443 +533,510 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+    // API configuration
+    var API_CONFIG = {
+        endpoint: 'https://cwruxrgateway.azurewebsites.net/api/v4/Object',
+        headers: {
+            'Content-Type': 'application/json',
+            'ApiKey': '2B06144BF7FF64746EBFBB2C903F59'
+            // AnchorCode will be added from textbox input
+        },
+        targetObjectSource: 'https://cwruxrdeck.blob.core.windows.net/filecache/c4433760-1861-4882-9c06-0bda81682004.obj'
+    };
+    
+    // Get DOM elements
+    const probe = document.getElementById('probe');
+    const xPosition = document.getElementById('xPosition');
+    const yPosition = document.getElementById('yPosition');
+    const zPosition = document.getElementById('zPosition');
+    const incrementInput = document.getElementById('increment');
+    const historyContainer = document.getElementById('historyContainer');
+    const apiToggle = document.getElementById('apiToggle');
+    const apiStatus = document.getElementById('apiStatus');
+    const apiStatusText = document.getElementById('apiStatusText');
+    const findObjectsBtn = document.getElementById('findObjects');
+    const objectSelect = document.getElementById('objectSelect');
+    const anchorCodeInput = document.getElementById('my-textbox');
+    
+    // API state
+    let apiConnected = false;
+    let targetObject = null;
+    let allObjects = [];
+    
+    // Current position
+    let position = {
+        x: 0,
+        y: 0,
+        z: 0
+    };
+    
+    // Initial probe position
+    updateProbePosition();
+    
+    // Movement directions
+    const directions = {
+        up: { axis: 'y', value: 1, name: 'UP' },
+        down: { axis: 'y', value: -1, name: 'DOWN' },
+        left: { axis: 'x', value: -1, name: 'LEFT' },
+        right: { axis: 'x', value: 1, name: 'RIGHT' },
+        forward: { axis: 'z', value: 1, name: 'FORWARD' },
+        backward: { axis: 'z', value: -1, name: 'BACKWARD' }
+    };
+    
+    // Function to get current anchor code from textbox
+    function getCurrentAnchorCode() {
+        return anchorCodeInput.value.trim();
+    }
+    
+    // Function to get API headers with current anchor code
+    function getApiHeaders() {
+        const headers = {...API_CONFIG.headers};
+        const anchorCode = getCurrentAnchorCode();
+        
+        if (anchorCode) {
+            headers['AnchorCode'] = anchorCode;
+        }
+        
+        return headers;
+    }
+    
+    // Add to history
+    function addToHistory(message, type = '') {
+        const now = new Date().toLocaleTimeString();
+        const historyItem = document.createElement('div');
+        historyItem.className = 'history-item';
+        if (type) historyItem.classList.add(type);
+        historyItem.textContent = `[${now}] ${message}`;
+        historyContainer.prepend(historyItem);
+        
+        // Limit history items
+        if (historyContainer.children.length > 50) {
+            historyContainer.removeChild(historyContainer.lastChild);
+        }
+        
+        console.log(`[${now}] ${message}`);
+    }
+    
+    // Update API status
+    function updateApiStatus(connected, message) {
+        apiConnected = connected;
+        apiStatus.className = 'status-indicator ' + (connected ? 'status-online' : 'status-offline');
+        apiStatusText.textContent = message;
+    }
+    
+    // Update probe position in visualization
+    function updateProbePosition() {
+        // Set position values
+        xPosition.textContent = position.x.toFixed(3);
+        yPosition.textContent = position.y.toFixed(3);
+        zPosition.textContent = position.z.toFixed(3);
+        
+        // Calculate visual position (mapping 3D space to the visualization)
+        const visualX = 50 + position.x * 500; // Center is 50%, multiplier for visual effect
+        const visualY = 50 - position.y * 500; // Inverted Y axis in browser
+        const visualZ = 0 + position.z * 500;  // Z affects size/shadow for 3D effect
+        
+        // Scale based on z position for perspective effect
+        const scale = 1 + position.z * 0.5;
+        
+        // Apply transformations
+        probe.style.left = `${visualX}%`;
+        probe.style.top = `${visualY}%`;
+        probe.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        
+        // Z-index based on Y position to handle overlapping
+        probe.style.zIndex = Math.floor(position.y * 100 + 100);
+        
+        // Adjust shadow based on height
+        const shadowBlur = 5 + Math.abs(position.z) * 10;
+        const shadowY = 5 + position.z * 15;
+        probe.style.boxShadow = `0 ${shadowY}px ${shadowBlur}px rgba(0,0,0,0.2)`;
+    }
+    
+    // Check API connection
+    async function checkApiConnection() {
+        if (!apiToggle.checked) {
+            updateApiStatus(false, 'API control disabled');
+            return false;
+        }
+        
+        const anchorCode = getCurrentAnchorCode();
+        if (!anchorCode) {
+            updateApiStatus(false, 'No anchor code provided');
+            addToHistory('Please enter an anchor code', 'error');
+            return false;
+        }
+        
+        try {
+            const response = await fetch(API_CONFIG.endpoint, {
+                method: 'GET',
+                headers: getApiHeaders()
+            });
+            
+            if (response.ok) {
+                updateApiStatus(true, 'Connected to API');
+                return true;
+            } else {
+                updateApiStatus(false, `API error: ${response.status}`);
+                return false;
+            }
+        } catch (error) {
+            updateApiStatus(false, `Connection error: ${error.message}`);
+            return false;
+        }
+    }
+    
+    // Find objects in API
+    async function findObjects() {
+        if (!apiToggle.checked) {
+            addToHistory('API control is disabled', 'error');
+            return;
+        }
+        
+        const anchorCode = getCurrentAnchorCode();
+        if (!anchorCode) {
+            addToHistory('Please enter an anchor code', 'error');
+            return;
+        }
+        
+        addToHistory(`Searching for objects with anchor code: ${anchorCode}...`);
+        
+        try {
+            const response = await fetch(API_CONFIG.endpoint, {
+                method: 'GET',
+                headers: getApiHeaders()
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+            
+            allObjects = await response.json();
+            
+            // Clear select options
+            objectSelect.innerHTML = '';
+            
+            // Add default option
+            const defaultOption = document.createElement('option');
+            defaultOption.value = 'default';
+            defaultOption.textContent = 'Default Target Object';
+            objectSelect.appendChild(defaultOption);
+            
+            // Find target object by source
+            const targetObjects = allObjects.filter(obj => 
+                obj.source === API_CONFIG.targetObjectSource
+            );
+            
+            if (targetObjects.length > 0) {
+                targetObject = targetObjects[0];
+                // Update position from target object
+                if (targetObject.pose && targetObject.pose.position) {
+                    position = {
+                        x: targetObject.pose.position.x,
+                        y: targetObject.pose.position.y,
+                        z: targetObject.pose.position.z
+                    };
+                    updateProbePosition();
+                }
+                
+                addToHistory(`Found target object: ${targetObject.id}`, 'success');
+                
+                // Add target object to select
+                const targetOption = document.createElement('option');
+                targetOption.value = targetObject.id;
+                targetOption.textContent = `Target: ${targetObject.id} (${targetObject.type})`;
+                targetOption.selected = true;
+                objectSelect.appendChild(targetOption);
+            } else {
+                addToHistory('Target object not found', 'error');
+            }
+            
+            // Add other objects to select
+            allObjects.forEach(obj => {
+                if (!targetObject || obj.id !== targetObject.id) {
+                    const option = document.createElement('option');
+                    option.value = obj.id;
+                    option.textContent = `${obj.id} (${obj.type})`;
+                    objectSelect.appendChild(option);
+                }
+            });
+            
+            addToHistory(`Found ${allObjects.length} total objects`);
+            updateApiStatus(true, `Connected - ${allObjects.length} objects found`);
+            
+        } catch (error) {
+            addToHistory(`Error finding objects: ${error.message}`, 'error');
+            updateApiStatus(false, `Error: ${error.message}`);
+        }
+    }
+    
+    // Move probe via API
+    async function moveProbeViaApi(axis, value, position) {
+        if (!apiToggle.checked) {
+            return { success: false, message: 'API control is disabled' };
+        }
+        
+        if (!targetObject) {
+            return { success: false, message: 'No target object selected' };
+        }
+        
+        const anchorCode = getCurrentAnchorCode();
+        if (!anchorCode) {
+            return { success: false, message: 'No anchor code provided' };
+        }
+        
+        try {
+            // Create a deep copy of the target object
+            const updatedObject = JSON.parse(JSON.stringify(targetObject));
+            
+            // Ensure pose and position objects exist
+            if (!updatedObject.pose) updatedObject.pose = {};
+            if (!updatedObject.pose.position) updatedObject.pose.position = { x: 0, y: 0, z: 0 };
+            
+            // Update the specific axis
+            //updatedObject.pose.position[axis] = position[axis];
+            updatedObject.pose.position = position;
 
-            // Get anchor code and put in a variable
-            var anchorCode = document.getElementById('my-textbox').value;
+            // Send update to API
+            const response = await fetch(`${API_CONFIG.endpoint}/${targetObject.id}`, {
+                method: 'PUT',
+                headers: getApiHeaders(),
+                body: JSON.stringify(updatedObject)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+            
+            // Try to parse response
+            try {
+                const result = await response.json();
+                return { success: true, message: 'Position updated via API', data: result };
+            } catch (parseError) {
+                return { success: true, message: 'Position updated (no response data)' };
+            }
+            
+        } catch (error) {
+            return { success: false, message: `API error: ${error.message}` };
+        }
+    }
+    
+    // Move probe (with optional API update)
+    async function moveProbe(direction) {
+        const dir = directions[direction];
+        if (!dir) return;
+        
+        // Get increment value
+        const increment = parseFloat(incrementInput.value) || 0.01;
+        
+        // Apply movement to local position
+        position[dir.axis] += dir.value * increment;
+        
+        // Constrain to reasonable range
+        position.x = Math.max(-5, Math.min(5, position.x));
+        position.y = Math.max(-5, Math.min(5, position.y));
+        position.z = Math.max(-5, Math.min(5, position.z));
+        
+        // Update visuals
+        updateProbePosition();
+        
+        // Add to history
+        addToHistory(`Moved ${dir.name}: ${dir.axis.toUpperCase()}${dir.value > 0 ? '+' : ''}${(dir.value * increment).toFixed(3)} to ${position.x},${position.y},${position.z}`);
+        
+        // Highlight button
+        const button = document.getElementById(direction);
+        if (button) {
+            button.style.backgroundColor = '#ff4757';
+            setTimeout(() => {
+                button.style.backgroundColor = '';
+            }, 200);
+        }
+        
+        // Update via API if enabled
+        if (apiToggle.checked) {
+            const result = await moveProbeViaApi(dir.axis, dir.value * increment, position);
+            
+            if (result.success) {
+                addToHistory(`API update successful: ${result.message}`, 'success');
+            } else {
+                addToHistory(`API update failed: ${result.message}`, 'error');
+            }
+        }
+    }
+    
+    // Reset probe position
+    async function resetProbe() {
+        position = { x: -0.5, y: 1.2, z: 0 };
+        updateProbePosition();
+        addToHistory(`POSITION RESET TO: ${position.x}, ${position.y}, ${position.z}`);
+        
+        // Highlight button
+        const button = document.getElementById('center');
+        if (button) {
+            button.style.backgroundColor = '#ff4757';
+            setTimeout(() => {
+                button.style.backgroundColor = '';
+            }, 200);
+        }
+        
+        // Reset via API if enabled
+        if (apiToggle.checked && targetObject) {
+            const anchorCode = getCurrentAnchorCode();
+            if (!anchorCode) {
+                addToHistory('API reset failed: No anchor code provided', 'error');
+                return;
+            }
+            
+            try {
+                // Create a deep copy of the target object
+                const updatedObject = JSON.parse(JSON.stringify(targetObject));
+                
+                // Reset position
+                if (!updatedObject.pose) updatedObject.pose = {};
+                updatedObject.pose.position = position;
+                
+                // Send update to API
+                const response = await fetch(`${API_CONFIG.endpoint}/${targetObject.id}`, {
+                    method: 'PUT',
+                    headers: getApiHeaders(),
+                    body: JSON.stringify(updatedObject)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+                
+                addToHistory('API position reset successful', 'success');
+                
+            } catch (error) {
+                addToHistory(`API reset failed: ${error.message}`, 'error');
+            }
+        }
+    }
+    
+    // Handle object selection change
+    function handleObjectSelectChange() {
+        const selectedId = objectSelect.value;
+        
+        if (selectedId === 'default') {
+            // Keep using the default target
+            return;
+        }
+        
+        // Find the selected object
+        const selected = allObjects.find(obj => obj.id === selectedId);
+        
+        if (selected) {
+            targetObject = selected;
+            addToHistory(`Selected object: ${targetObject.id}`);
+            
+            // Update position if available
+            if (targetObject.pose && targetObject.pose.position) {
+                position = {
+                    x: targetObject.pose.position.x,
+                    y: targetObject.pose.position.y,
+                    z: targetObject.pose.position.z
+                };
+                updateProbePosition();
+                addToHistory('Updated position from selected object');
+            }
+        }
+    }
+    
+    // Handle anchor code input change
+    function handleAnchorCodeChange() {
+        const anchorCode = getCurrentAnchorCode();
+        if (anchorCode) {
+            addToHistory(`Anchor code set to: ${anchorCode}`);
+            if (apiConnected) {
+                // If already connected, recheck the connection with new anchor code
+                checkApiConnection();
+            }
+        } else {
+            addToHistory('Anchor code cleared', 'error');
+            updateApiStatus(false, 'No anchor code provided');
+        }
+    }
+    
+    // Button event listeners
+    Object.keys(directions).forEach(direction => {
+        const button = document.getElementById(direction);
+        if (button) {
+            button.addEventListener('click', () => moveProbe(direction));
+        }
+    });
+    
+    // Reset button
+    document.getElementById('center').addEventListener('click', resetProbe);
+    
+    // Find objects button
+    findObjectsBtn.addEventListener('click', findObjects);
+    
+    // Object select change
+    objectSelect.addEventListener('change', handleObjectSelectChange);
+    
+    // Anchor code input change
+    anchorCodeInput.addEventListener('change', handleAnchorCodeChange);
+    anchorCodeInput.addEventListener('blur', handleAnchorCodeChange);
+    
+    // API toggle
+    apiToggle.addEventListener('change', function() {
+        if (this.checked) {
+            checkApiConnection();
+            addToHistory('API control enabled');
+        } else {
+            updateApiStatus(false, 'API control disabled');
+            addToHistory('API control disabled');
+        }
+    });
+    
+    // Keyboard controls
+    document.addEventListener('keydown', function(event) {
+        switch(event.key) {
+            case 'ArrowUp':
+                moveProbe('up');
+                break;
+            case 'ArrowDown':
+                moveProbe('down');
+                break;
+            case 'ArrowLeft':
+                moveProbe('left');
+                break;
+            case 'ArrowRight':
+                moveProbe('right');
+                break;
+            case 'PageUp':
+                moveProbe('forward');
+                break;
+            case 'PageDown':
+                moveProbe('backward');
+                break;
+            case 'Home':
+                resetProbe();
+                break;
+        }
+    });
+    
+    // Initialize
+    addToHistory('3D Probe Controller initialized');
+    
+    // Initial check for anchor code
+    const initialAnchorCode = getCurrentAnchorCode();
+    if (initialAnchorCode) {
+        addToHistory(`Initial anchor code: ${initialAnchorCode}`);
+    } else {
+        addToHistory('Please enter an anchor code', 'error');
+    }
+    
+    // Check API connection
+    setTimeout(async () => {
+        const connected = await checkApiConnection();
+        if (connected) {
+            findObjects();  // Automatically find objects if connected
+        }
+    }, 500);
+});
 
-            // API configuration
-            var API_CONFIG = {
-                endpoint: 'https://cwruxrgateway.azurewebsites.net/api/v4/Object',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'ApiKey': '2B06144BF7FF64746EBFBB2C903F59',
-                    'AnchorCode': 'NKXC'
-                },
-                targetObjectSource: 'https://cwruxrdeck.blob.core.windows.net/filecache/c4433760-1861-4882-9c06-0bda81682004.obj'
-            };
-            
-            // Get DOM elements
-            const probe = document.getElementById('probe');
-            const xPosition = document.getElementById('xPosition');
-            const yPosition = document.getElementById('yPosition');
-            const zPosition = document.getElementById('zPosition');
-            const incrementInput = document.getElementById('increment');
-            const historyContainer = document.getElementById('historyContainer');
-            const apiToggle = document.getElementById('apiToggle');
-            const apiStatus = document.getElementById('apiStatus');
-            const apiStatusText = document.getElementById('apiStatusText');
-            const findObjectsBtn = document.getElementById('findObjects');
-            const objectSelect = document.getElementById('objectSelect');
-            
-            // API state
-            let apiConnected = false;
-            let targetObject = null;
-            let allObjects = [];
-            
-            // Current position
-            let position = {
-                x: 0,
-                y: 0,
-                z: 0
-            };
-            
-            // Initial probe position
-            updateProbePosition();
-            
-            // Movement directions
-            const directions = {
-                up: { axis: 'y', value: 1, name: 'UP' },
-                down: { axis: 'y', value: -1, name: 'DOWN' },
-                left: { axis: 'x', value: -1, name: 'LEFT' },
-                right: { axis: 'x', value: 1, name: 'RIGHT' },
-                forward: { axis: 'z', value: 1, name: 'FORWARD' },
-                backward: { axis: 'z', value: -1, name: 'BACKWARD' }
-            };
-            
-            // Add to history
-            function addToHistory(message, type = '') {
-                const now = new Date().toLocaleTimeString();
-                const historyItem = document.createElement('div');
-                historyItem.className = 'history-item';
-                if (type) historyItem.classList.add(type);
-                historyItem.textContent = `[${now}] ${message}`;
-                historyContainer.prepend(historyItem);
-                
-                // Limit history items
-                if (historyContainer.children.length > 50) {
-                    historyContainer.removeChild(historyContainer.lastChild);
-                }
-                
-                console.log(`[${now}] ${message}`);
-            }
-            
-            // Update API status
-            function updateApiStatus(connected, message) {
-                apiConnected = connected;
-                apiStatus.className = 'status-indicator ' + (connected ? 'status-online' : 'status-offline');
-                apiStatusText.textContent = message;
-            }
-            
-            // Update probe position in visualization
-            function updateProbePosition() {
-                // Set position values
-                xPosition.textContent = position.x.toFixed(3);
-                yPosition.textContent = position.y.toFixed(3);
-                zPosition.textContent = position.z.toFixed(3);
-                
-                // Calculate visual position (mapping 3D space to the visualization)
-                const visualX = 50 + position.x * 500; // Center is 50%, multiplier for visual effect
-                const visualY = 50 - position.y * 500; // Inverted Y axis in browser
-                const visualZ = 0 + position.z * 500;  // Z affects size/shadow for 3D effect
-                
-                // Scale based on z position for perspective effect
-                const scale = 1 + position.z * 0.5;
-                
-                // Apply transformations
-                probe.style.left = `${visualX}%`;
-                probe.style.top = `${visualY}%`;
-                probe.style.transform = `translate(-50%, -50%) scale(${scale})`;
-                
-                // Z-index based on Y position to handle overlapping
-                probe.style.zIndex = Math.floor(position.y * 100 + 100);
-                
-                // Adjust shadow based on height
-                const shadowBlur = 5 + Math.abs(position.z) * 10;
-                const shadowY = 5 + position.z * 15;
-                probe.style.boxShadow = `0 ${shadowY}px ${shadowBlur}px rgba(0,0,0,0.2)`;
-            }
-            
-            // Check API connection
-            async function checkApiConnection() {
-                if (!apiToggle.checked) {
-                    updateApiStatus(false, 'API control disabled');
-                    return false;
-                }
-                
-                try {
-                    const response = await fetch(API_CONFIG.endpoint, {
-                        method: 'GET',
-                        headers: API_CONFIG.headers
-                    });
-                    
-                    if (response.ok) {
-                        updateApiStatus(true, 'Connected to API');
-                        return true;
-                    } else {
-                        updateApiStatus(false, `API error: ${response.status}`);
-                        return false;
-                    }
-                } catch (error) {
-                    updateApiStatus(false, `Connection error: ${error.message}`);
-                    return false;
-                }
-            }
-            
-            // Find objects in API
-            async function findObjects() {
-                if (!apiToggle.checked) {
-                    addToHistory('API control is disabled', 'error');
-                    return;
-                }
-                
-                addToHistory('Searching for objects...');
-                
-                try {
-                    const response = await fetch(API_CONFIG.endpoint, {
-                        method: 'GET',
-                        headers: API_CONFIG.headers
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`API error: ${response.status}`);
-                    }
-                    
-                    allObjects = await response.json();
-                    
-                    // Clear select options
-                    objectSelect.innerHTML = '';
-                    
-                    // Add default option
-                    const defaultOption = document.createElement('option');
-                    defaultOption.value = 'default';
-                    defaultOption.textContent = 'Default Target Object';
-                    objectSelect.appendChild(defaultOption);
-                    
-                    // Find target object by source
-                    const targetObjects = allObjects.filter(obj => 
-                        obj.source === API_CONFIG.targetObjectSource
-                    );
-                    
-                    if (targetObjects.length > 0) {
-                        targetObject = targetObjects[0];
-                        // Update position from target object
-                        if (targetObject.pose && targetObject.pose.position) {
-                            position = {
-                                x: targetObject.pose.position.x,
-                                y: targetObject.pose.position.y,
-                                z: targetObject.pose.position.z
-                            };
-                            updateProbePosition();
-                        }
-                        
-                        addToHistory(`Found target object: ${targetObject.id}`, 'success');
-                        
-                        // Add target object to select
-                        const targetOption = document.createElement('option');
-                        targetOption.value = targetObject.id;
-                        targetOption.textContent = `Target: ${targetObject.id} (${targetObject.type})`;
-                        targetOption.selected = true;
-                        objectSelect.appendChild(targetOption);
-                    } else {
-                        addToHistory('Target object not found', 'error');
-                    }
-                    
-                    // Add other objects to select
-                    allObjects.forEach(obj => {
-                        if (!targetObject || obj.id !== targetObject.id) {
-                            const option = document.createElement('option');
-                            option.value = obj.id;
-                            option.textContent = `${obj.id} (${obj.type})`;
-                            objectSelect.appendChild(option);
-                        }
-                    });
-                    
-                    addToHistory(`Found ${allObjects.length} total objects`);
-                    updateApiStatus(true, `Connected - ${allObjects.length} objects found`);
-                    
-                } catch (error) {
-                    addToHistory(`Error finding objects: ${error.message}`, 'error');
-                    updateApiStatus(false, `Error: ${error.message}`);
-                }
-            }
-            
-            // Move probe via API
-            async function moveProbeViaApi(axis, value) {
-                if (!apiToggle.checked) {
-                    return { success: false, message: 'API control is disabled' };
-                }
-                
-                if (!targetObject) {
-                    return { success: false, message: 'No target object selected' };
-                }
-                
-                try {
-                    // Create a deep copy of the target object
-                    const updatedObject = JSON.parse(JSON.stringify(targetObject));
-                    
-                    // Ensure pose and position objects exist
-                    if (!updatedObject.pose) updatedObject.pose = {};
-                    if (!updatedObject.pose.position) updatedObject.pose.position = { x: 0, y: 0, z: 0 };
-                    
-                    // Update the specific axis
-                    updatedObject.pose.position[axis] = position[axis];
-                    
-                    // Send update to API
-                    const response = await fetch(`${API_CONFIG.endpoint}/${targetObject.id}`, {
-                        method: 'PUT',
-                        headers: API_CONFIG.headers,
-                        body: JSON.stringify(updatedObject)
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`API error: ${response.status}`);
-                    }
-                    
-                    // Try to parse response
-                    try {
-                        const result = await response.json();
-                        return { success: true, message: 'Position updated via API', data: result };
-                    } catch (parseError) {
-                        return { success: true, message: 'Position updated (no response data)' };
-                    }
-                    
-                } catch (error) {
-                    return { success: false, message: `API error: ${error.message}` };
-                }
-            }
-            
-            // Move probe (with optional API update)
-            async function moveProbe(direction) {
-                const dir = directions[direction];
-                if (!dir) return;
-                
-                // Get increment value
-                const increment = parseFloat(incrementInput.value) || 0.01;
-                
-                // Apply movement to local position
-                position[dir.axis] += dir.value * increment;
-                
-                // Constrain to reasonable range
-                position.x = Math.max(-5, Math.min(5, position.x));
-                position.y = Math.max(-5, Math.min(5, position.y));
-                position.z = Math.max(-5, Math.min(5, position.z));
-                
-                // Update visuals
-                updateProbePosition();
-                
-                // Add to history
-                addToHistory(`Moved ${dir.name}: ${dir.axis.toUpperCase()}${dir.value > 0 ? '+' : ''}${(dir.value * increment).toFixed(3)}`);
-                
-                // Highlight button
-                const button = document.getElementById(direction);
-                if (button) {
-                    button.style.backgroundColor = '#ff4757';
-                    setTimeout(() => {
-                        button.style.backgroundColor = '';
-                    }, 200);
-                }
-                
-                // Update via API if enabled
-                if (apiToggle.checked) {
-                    const result = await moveProbeViaApi(dir.axis, dir.value * increment);
-                    
-                    if (result.success) {
-                        addToHistory(`API update successful: ${result.message}`, 'success');
-                    } else {
-                        addToHistory(`API update failed: ${result.message}`, 'error');
-                    }
-                }
-            }
-            
-            // Reset probe position
-            async function resetProbe() {
-                position = { x: 0, y: 0, z: 0 };
-                updateProbePosition();
-                addToHistory('Position RESET to (0, 0, 0)');
-                
-                // Highlight button
-                const button = document.getElementById('center');
-                if (button) {
-                    button.style.backgroundColor = '#ff4757';
-                    setTimeout(() => {
-                        button.style.backgroundColor = '';
-                    }, 200);
-                }
-                
-                // Reset via API if enabled
-                if (apiToggle.checked && targetObject) {
-                    try {
-                        // Create a deep copy of the target object
-                        const updatedObject = JSON.parse(JSON.stringify(targetObject));
-                        
-                        // Reset position
-                        if (!updatedObject.pose) updatedObject.pose = {};
-                        updatedObject.pose.position = { x: 0, y: 0, z: 0 };
-                        
-                        // Send update to API
-                        const response = await fetch(`${API_CONFIG.endpoint}/${targetObject.id}`, {
-                            method: 'PUT',
-                            headers: API_CONFIG.headers,
-                            body: JSON.stringify(updatedObject)
-                        });
-                        
-                        if (!response.ok) {
-                            throw new Error(`API error: ${response.status}`);
-                        }
-                        
-                        addToHistory('API position reset successful', 'success');
-                        
-                    } catch (error) {
-                        addToHistory(`API reset failed: ${error.message}`, 'error');
-                    }
-                }
-            }
-            
-            // Handle object selection change
-            function handleObjectSelectChange() {
-                const selectedId = objectSelect.value;
-                
-                if (selectedId === 'default') {
-                    // Keep using the default target
-                    return;
-                }
-                
-                // Find the selected object
-                const selected = allObjects.find(obj => obj.id === selectedId);
-                
-                if (selected) {
-                    targetObject = selected;
-                    addToHistory(`Selected object: ${targetObject.id}`);
-                    
-                    // Update position if available
-                    if (targetObject.pose && targetObject.pose.position) {
-                        position = {
-                            x: targetObject.pose.position.x,
-                            y: targetObject.pose.position.y,
-                            z: targetObject.pose.position.z
-                        };
-                        updateProbePosition();
-                        addToHistory('Updated position from selected object');
-                    }
-                }
-            }
-            
-            // Button event listeners
-            Object.keys(directions).forEach(direction => {
-                const button = document.getElementById(direction);
-                if (button) {
-                    button.addEventListener('click', () => moveProbe(direction));
-                }
-            });
-            
-            // Reset button
-            document.getElementById('center').addEventListener('click', resetProbe);
-            
-            // Find objects button
-            findObjectsBtn.addEventListener('click', findObjects);
-            
-            // Object select change
-            objectSelect.addEventListener('change', handleObjectSelectChange);
-            
-            // API toggle
-            apiToggle.addEventListener('change', function() {
-                if (this.checked) {
-                    checkApiConnection();
-                    addToHistory('API control enabled');
-                } else {
-                    updateApiStatus(false, 'API control disabled');
-                    addToHistory('API control disabled');
-                }
-            });
-            
-            // Keyboard controls
-            document.addEventListener('keydown', function(event) {
-                switch(event.key) {
-                    case 'ArrowUp':
-                        moveProbe('up');
-                        break;
-                    case 'ArrowDown':
-                        moveProbe('down');
-                        break;
-                    case 'ArrowLeft':
-                        moveProbe('left');
-                        break;
-                    case 'ArrowRight':
-                        moveProbe('right');
-                        break;
-                    case 'PageUp':
-                        moveProbe('forward');
-                        break;
-                    case 'PageDown':
-                        moveProbe('backward');
-                        break;
-                    case 'Home':
-                        resetProbe();
-                        break;
-                }
-            });
-            
-            // Initialize
-            addToHistory('3D Probe Controller initialized');
-            
-            // Check API connection
-            setTimeout(async () => {
-                const connected = await checkApiConnection();
-                if (connected) {
-                    findObjects();  // Automatically find objects if connected
-                }
-            }, 500);
-        });
     </script>
 </body>
 </html>
