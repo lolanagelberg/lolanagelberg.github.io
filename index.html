@@ -39,6 +39,7 @@
             display: flex;
             justify-content: space-around;
             margin: 20px 0;
+            flex-wrap: wrap;
         }
         
         .position-card {
@@ -47,6 +48,7 @@
             border-radius: 5px;
             text-align: center;
             width: 30%;
+            margin-bottom: 10px;
         }
         
         .position-card h3 {
@@ -145,6 +147,38 @@
             justify-content: center;
         }
         
+        .rotation-controls {
+            margin: 20px 0;
+        }
+        
+        .rotation-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 10px;
+        }
+        
+        .rotation-panel button {
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #9c27b0;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+        }
+        
+        .rotation-panel button:hover {
+            background-color: #7b1fa2;
+            transform: scale(1.05);
+        }
+        
+        .rotation-panel button:active {
+            background-color: #ff4757;
+            transform: scale(0.98);
+        }
+        
         .increment-control {
             display: flex;
             align-items: center;
@@ -184,6 +218,28 @@
             transform-style: preserve-3d;
             transition: all 0.3s ease;
             box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+        
+        .probe:after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #333;
+            transform: translateY(-50%);
+        }
+        
+        .probe:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+            background-color: #333;
+            transform: translateX(-50%);
         }
         
         .floor {
@@ -490,11 +546,25 @@
                 <h3>Z Position</h3>
                 <div class="position-value" id="zPosition">0.000</div>
             </div>
+            <div class="position-card">
+                <h3>X Rotation</h3>
+                <div class="position-value" id="xRotation">0.000</div>
+            </div>
+            <div class="position-card">
+                <h3>Y Rotation</h3>
+                <div class="position-value" id="yRotation">0.000</div>
+            </div>
+            <div class="position-card">
+                <h3>Z Rotation</h3>
+                <div class="position-value" id="zRotation">0.000</div>
+            </div>
         </div>
         
         <div class="increment-control">
             <label for="increment">Movement Increment:</label>
             <input type="number" id="increment" value="0.01" step="0.001" min="0.001" max="1">
+            <label for="rotationIncrement">Rotation Increment (deg):</label>
+            <input type="number" id="rotationIncrement" value="15" step="1" min="1" max="90">
         </div>
         
         <h2>Movement Controls</h2>
@@ -512,6 +582,20 @@
             <button id="backward">BACKWARD (Z-)</button>
         </div>
         
+        <h2>Rotation Controls</h2>
+        
+        <div class="rotation-controls">
+            <div class="rotation-panel">
+                <button id="rotateXPlus">PITCH UP (X+)</button>
+                <button id="rotateYPlus">YAW RIGHT (Y+)</button>
+                <button id="rotateZPlus">ROLL CW (Z+)</button>
+                <button id="rotateXMinus">PITCH DOWN (X-)</button>
+                <button id="rotateYMinus">YAW LEFT (Y-)</button>
+                <button id="rotateZMinus">ROLL CCW (Z-)</button>
+                <button id="resetRotation" style="grid-column: span 3; background-color: #6c757d;">RESET ROTATION</button>
+            </div>
+        </div>
+        
         <div class="keyboard-shortcuts">
             <h3>Keyboard Shortcuts</h3>
             <div class="shortcuts-grid">
@@ -522,6 +606,13 @@
                 <div class="shortcut"><span>Move Forward (Z+)</span> <kbd>Page Up</kbd></div>
                 <div class="shortcut"><span>Move Backward (Z-)</span> <kbd>Page Down</kbd></div>
                 <div class="shortcut"><span>Reset Position</span> <kbd>Home</kbd></div>
+                <div class="shortcut"><span>Pitch Up (X+)</span> <kbd>W</kbd></div>
+                <div class="shortcut"><span>Pitch Down (X-)</span> <kbd>S</kbd></div>
+                <div class="shortcut"><span>Yaw Left (Y-)</span> <kbd>A</kbd></div>
+                <div class="shortcut"><span>Yaw Right (Y+)</span> <kbd>D</kbd></div>
+                <div class="shortcut"><span>Roll CW (Z+)</span> <kbd>E</kbd></div>
+                <div class="shortcut"><span>Roll CCW (Z-)</span> <kbd>Q</kbd></div>
+                <div class="shortcut"><span>Reset Rotation</span> <kbd>R</kbd></div>
             </div>
         </div>
         
@@ -533,510 +624,540 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-    // API configuration
-    var API_CONFIG = {
-        endpoint: 'https://cwruxrgateway.azurewebsites.net/api/v4/Object',
-        headers: {
-            'Content-Type': 'application/json',
-            'ApiKey': '2B06144BF7FF64746EBFBB2C903F59'
-            // AnchorCode will be added from textbox input
-        },
-        targetObjectSource: 'https://cwruxrdeck.blob.core.windows.net/filecache/c4433760-1861-4882-9c06-0bda81682004.obj'
-    };
-    
-    // Get DOM elements
-    const probe = document.getElementById('probe');
-    const xPosition = document.getElementById('xPosition');
-    const yPosition = document.getElementById('yPosition');
-    const zPosition = document.getElementById('zPosition');
-    const incrementInput = document.getElementById('increment');
-    const historyContainer = document.getElementById('historyContainer');
-    const apiToggle = document.getElementById('apiToggle');
-    const apiStatus = document.getElementById('apiStatus');
-    const apiStatusText = document.getElementById('apiStatusText');
-    const findObjectsBtn = document.getElementById('findObjects');
-    const objectSelect = document.getElementById('objectSelect');
-    const anchorCodeInput = document.getElementById('my-textbox');
-    
-    // API state
-    let apiConnected = false;
-    let targetObject = null;
-    let allObjects = [];
-    
-    // Current position
-    let position = {
-        x: 0,
-        y: 0,
-        z: 0
-    };
-    
-    // Initial probe position
-    updateProbePosition();
-    
-    // Movement directions
-    const directions = {
-        up: { axis: 'y', value: 1, name: 'UP' },
-        down: { axis: 'y', value: -1, name: 'DOWN' },
-        left: { axis: 'x', value: -1, name: 'LEFT' },
-        right: { axis: 'x', value: 1, name: 'RIGHT' },
-        forward: { axis: 'z', value: 1, name: 'FORWARD' },
-        backward: { axis: 'z', value: -1, name: 'BACKWARD' }
-    };
-    
-    // Function to get current anchor code from textbox
-    function getCurrentAnchorCode() {
-        return anchorCodeInput.value.trim();
-    }
-    
-    // Function to get API headers with current anchor code
-    function getApiHeaders() {
-        const headers = {...API_CONFIG.headers};
-        const anchorCode = getCurrentAnchorCode();
-        
-        if (anchorCode) {
-            headers['AnchorCode'] = anchorCode;
-        }
-        
-        return headers;
-    }
-    
-    // Add to history
-    function addToHistory(message, type = '') {
-        const now = new Date().toLocaleTimeString();
-        const historyItem = document.createElement('div');
-        historyItem.className = 'history-item';
-        if (type) historyItem.classList.add(type);
-        historyItem.textContent = `[${now}] ${message}`;
-        historyContainer.prepend(historyItem);
-        
-        // Limit history items
-        if (historyContainer.children.length > 50) {
-            historyContainer.removeChild(historyContainer.lastChild);
-        }
-        
-        console.log(`[${now}] ${message}`);
-    }
-    
-    // Update API status
-    function updateApiStatus(connected, message) {
-        apiConnected = connected;
-        apiStatus.className = 'status-indicator ' + (connected ? 'status-online' : 'status-offline');
-        apiStatusText.textContent = message;
-    }
-    
-    // Update probe position in visualization
-    function updateProbePosition() {
-        // Set position values
-        xPosition.textContent = position.x.toFixed(3);
-        yPosition.textContent = position.y.toFixed(3);
-        zPosition.textContent = position.z.toFixed(3);
-        
-        // Calculate visual position (mapping 3D space to the visualization)
-        const visualX = 50 + position.x * 500; // Center is 50%, multiplier for visual effect
-        const visualY = 50 - position.y * 500; // Inverted Y axis in browser
-        const visualZ = 0 + position.z * 500;  // Z affects size/shadow for 3D effect
-        
-        // Scale based on z position for perspective effect
-        const scale = 1 + position.z * 0.5;
-        
-        // Apply transformations
-        probe.style.left = `${visualX}%`;
-        probe.style.top = `${visualY}%`;
-        probe.style.transform = `translate(-50%, -50%) scale(${scale})`;
-        
-        // Z-index based on Y position to handle overlapping
-        probe.style.zIndex = Math.floor(position.y * 100 + 100);
-        
-        // Adjust shadow based on height
-        const shadowBlur = 5 + Math.abs(position.z) * 10;
-        const shadowY = 5 + position.z * 15;
-        probe.style.boxShadow = `0 ${shadowY}px ${shadowBlur}px rgba(0,0,0,0.2)`;
-    }
-    
-    // Check API connection
-    async function checkApiConnection() {
-        if (!apiToggle.checked) {
-            updateApiStatus(false, 'API control disabled');
-            return false;
-        }
-        
-        const anchorCode = getCurrentAnchorCode();
-        if (!anchorCode) {
-            updateApiStatus(false, 'No anchor code provided');
-            addToHistory('Please enter an anchor code', 'error');
-            return false;
-        }
-        
-        try {
-            const response = await fetch(API_CONFIG.endpoint, {
-                method: 'GET',
-                headers: getApiHeaders()
-            });
+            // API configuration
+            var API_CONFIG = {
+                endpoint: 'https://cwruxrgateway.azurewebsites.net/api/v4/Object',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'ApiKey': '2B06144BF7FF64746EBFBB2C903F59'
+                    // AnchorCode will be added from textbox input
+                },
+                targetObjectSource: 'https://cwruxrdeck.blob.core.windows.net/filecache/c4433760-1861-4882-9c06-0bda81682004.obj'
+            };
             
-            if (response.ok) {
-                updateApiStatus(true, 'Connected to API');
-                return true;
-            } else {
-                updateApiStatus(false, `API error: ${response.status}`);
-                return false;
-            }
-        } catch (error) {
-            updateApiStatus(false, `Connection error: ${error.message}`);
-            return false;
-        }
-    }
-    
-    // Find objects in API
-    async function findObjects() {
-        if (!apiToggle.checked) {
-            addToHistory('API control is disabled', 'error');
-            return;
-        }
-        
-        const anchorCode = getCurrentAnchorCode();
-        if (!anchorCode) {
-            addToHistory('Please enter an anchor code', 'error');
-            return;
-        }
-        
-        addToHistory(`Searching for objects with anchor code: ${anchorCode}...`);
-        
-        try {
-            const response = await fetch(API_CONFIG.endpoint, {
-                method: 'GET',
-                headers: getApiHeaders()
-            });
+            // Get DOM elements
+            const probe = document.getElementById('probe');
+            const xPosition = document.getElementById('xPosition');
+            const yPosition = document.getElementById('yPosition');
+            const zPosition = document.getElementById('zPosition');
+            const xRotation = document.getElementById('xRotation');
+            const yRotation = document.getElementById('yRotation');
+            const zRotation = document.getElementById('zRotation');
+            const incrementInput = document.getElementById('increment');
+            const rotationIncrementInput = document.getElementById('rotationIncrement');
+            const historyContainer = document.getElementById('historyContainer');
+            const apiToggle = document.getElementById('apiToggle');
+            const apiStatus = document.getElementById('apiStatus');
+            const apiStatusText = document.getElementById('apiStatusText');
+            const findObjectsBtn = document.getElementById('findObjects');
+            const objectSelect = document.getElementById('objectSelect');
+            const anchorCodeInput = document.getElementById('my-textbox');
             
-            if (!response.ok) {
-                throw new Error(`API error: ${response.status}`);
+            // API state
+            let apiConnected = false;
+            let targetObject = null;
+            let allObjects = [];
+            
+            // Current position and rotation
+            let position = {
+                x: 0,
+                y: 0,
+                z: 0
+            };
+            
+            let rotation = {
+                x: 0, // pitch
+                y: 0, // yaw
+                z: 0  // roll
+            };
+            
+            // Initial probe position and rotation
+            updateProbe();
+            
+            // Movement directions
+            const directions = {
+                up: { axis: 'y', value: 1, name: 'UP' },
+                down: { axis: 'y', value: -1, name: 'DOWN' },
+                left: { axis: 'x', value: -1, name: 'LEFT' },
+                right: { axis: 'x', value: 1, name: 'RIGHT' },
+                forward: { axis: 'z', value: 1, name: 'FORWARD' },
+                backward: { axis: 'z', value: -1, name: 'BACKWARD' }
+            };
+            
+            // Rotation directions
+            const rotations = {
+                rotateXPlus: { axis: 'x', value: 1, name: 'PITCH UP' },
+                rotateXMinus: { axis: 'x', value: -1, name: 'PITCH DOWN' },
+                rotateYPlus: { axis: 'y', value: 1, name: 'YAW RIGHT' },
+                rotateYMinus: { axis: 'y', value: -1, name: 'YAW LEFT' },
+                rotateZPlus: { axis: 'z', value: 1, name: 'ROLL CW' },
+                rotateZMinus: { axis: 'z', value: -1, name: 'ROLL CCW' }
+            };
+            
+            // Function to get current anchor code from textbox
+            function getCurrentAnchorCode() {
+                return anchorCodeInput.value.trim();
             }
             
-            allObjects = await response.json();
+            // Function to get API headers with current anchor code
+            function getApiHeaders() {
+                const headers = {...API_CONFIG.headers};
+                const anchorCode = getCurrentAnchorCode();
+                
+                if (anchorCode) {
+                    headers['AnchorCode'] = anchorCode;
+                }
+                
+                return headers;
+            }
             
-            // Clear select options
-            objectSelect.innerHTML = '';
+            // Add to history
+            function addToHistory(message, type = '') {
+                const now = new Date().toLocaleTimeString();
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                if (type) historyItem.classList.add(type);
+                historyItem.textContent = `[${now}] ${message}`;
+                historyContainer.prepend(historyItem);
+                
+                // Limit history items
+                if (historyContainer.children.length > 50) {
+                    historyContainer.removeChild(historyContainer.lastChild);
+                }
+                
+                console.log(`[${now}] ${message}`);
+            }
             
-            // Add default option
-            const defaultOption = document.createElement('option');
-            defaultOption.value = 'default';
-            defaultOption.textContent = 'Default Target Object';
-            objectSelect.appendChild(defaultOption);
+            // Update API status
+            function updateApiStatus(connected, message) {
+                apiConnected = connected;
+                apiStatus.className = 'status-indicator ' + (connected ? 'status-online' : 'status-offline');
+                apiStatusText.textContent = message;
+            }
             
-            // Find target object by source
-            const targetObjects = allObjects.filter(obj => 
-                obj.source === API_CONFIG.targetObjectSource
-            );
+            // Update probe position and rotation in visualization
+            function updateProbe() {
+                // Update position values display
+                xPosition.textContent = position.x.toFixed(3);
+                yPosition.textContent = position.y.toFixed(3);
+                zPosition.textContent = position.z.toFixed(3);
+                
+                // Update rotation values display
+                xRotation.textContent = rotation.x.toFixed(3);
+                yRotation.textContent = rotation.y.toFixed(3);
+                zRotation.textContent = rotation.z.toFixed(3);
+                
+                // Calculate visual position (mapping 3D space to the visualization)
+                const visualX = 50 + position.x * 500; // Center is 50%, multiplier for visual effect
+                const visualY = 50 - position.y * 500; // Inverted Y axis in browser
+                const visualZ = 0 + position.z * 500;  // Z affects size/shadow for 3D effect
+                
+                // Scale based on z position for perspective effect
+                const scale = 1 + position.z * 0.5;
+                
+                // Convert rotation degrees to radians
+                const rotX = rotation.x * Math.PI / 180;
+                const rotY = rotation.y * Math.PI / 180;
+                const rotZ = rotation.z * Math.PI / 180;
+                
+                // Apply transformations (position and rotation)
+                probe.style.left = `${visualX}%`;
+                probe.style.top = `${visualY}%`;
+                probe.style.transform = `translate(-50%, -50%) scale(${scale}) rotateX(${rotX}rad) rotateY(${rotY}rad) rotateZ(${rotZ}rad)`;
+                
+                // Z-index based on Y position to handle overlapping
+                probe.style.zIndex = Math.floor(position.y * 100 + 100);
+                
+                // Adjust shadow based on height
+                const shadowBlur = 5 + Math.abs(position.z) * 10;
+                const shadowY = 5 + position.z * 15;
+                probe.style.boxShadow = `0 ${shadowY}px ${shadowBlur}px rgba(0,0,0,0.2)`;
+            }
             
-            if (targetObjects.length > 0) {
-                targetObject = targetObjects[0];
-                // Update position from target object
-                if (targetObject.pose && targetObject.pose.position) {
-                    position = {
-                        x: targetObject.pose.position.x,
-                        y: targetObject.pose.position.y,
-                        z: targetObject.pose.position.z
+            // Check API connection
+            async function checkApiConnection() {
+                if (!apiToggle.checked) {
+                    updateApiStatus(false, 'API control disabled');
+                    return false;
+                }
+                
+                const anchorCode = getCurrentAnchorCode();
+                if (!anchorCode) {
+                    updateApiStatus(false, 'No anchor code provided');
+                    addToHistory('Please enter an anchor code', 'error');
+                    return false;
+                }
+                
+                try {
+                    const response = await fetch(API_CONFIG.endpoint, {
+                        method: 'GET',
+                        headers: getApiHeaders()
+                    });
+                    
+                    if (response.ok) {
+                        updateApiStatus(true, 'Connected to API');
+                        return true;
+                    } else {
+                        updateApiStatus(false, `API error: ${response.status}`);
+                        return false;
+                    }
+                } catch (error) {
+                    updateApiStatus(false, `Connection error: ${error.message}`);
+                    return false;
+                }
+            }
+            
+            // Find objects in API
+            async function findObjects() {
+                if (!apiToggle.checked) {
+                    addToHistory('API control is disabled', 'error');
+                    return;
+                }
+                
+                const anchorCode = getCurrentAnchorCode();
+                if (!anchorCode) {
+                    addToHistory('Please enter an anchor code', 'error');
+                    return;
+                }
+                
+                addToHistory(`Searching for objects with anchor code: ${anchorCode}...`);
+                
+                try {
+                    const response = await fetch(API_CONFIG.endpoint, {
+                        method: 'GET',
+                        headers: getApiHeaders()
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API error: ${response.status}`);
+                    }
+                    
+                    allObjects = await response.json();
+                    
+                    // Clear select options
+                    objectSelect.innerHTML = '';
+                    
+                    // Add default option
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = 'default';
+                    defaultOption.textContent = 'Default Target Object';
+                    objectSelect.appendChild(defaultOption);
+                    
+                    // Find target object by source
+                    const targetObjects = allObjects.filter(obj => 
+                        obj.source === API_CONFIG.targetObjectSource
+                    );
+                    
+                    if (targetObjects.length > 0) {
+                        targetObject = targetObjects[0];
+                        // Update position and rotation from target object
+                        if (targetObject.pose) {
+                            if (targetObject.pose.position) {
+                                position = {
+                                    x: targetObject.pose.position.x,
+                                    y: targetObject.pose.position.y,
+                                    z: targetObject.pose.position.z
+                                };
+                            }
+                            if (targetObject.pose.rotation) {
+                                rotation = {
+                                    x: targetObject.pose.rotation.x || 0,
+                                    y: targetObject.pose.rotation.y || 0,
+                                    z: targetObject.pose.rotation.z || 0
+                                };
+                            }
+                            updateProbe();
+                        }
+                        
+                        addToHistory(`Found target object: ${targetObject.id}`, 'success');
+                        
+                        // Add target object to select
+                        const targetOption = document.createElement('option');
+                        targetOption.value = targetObject.id;
+                        targetOption.textContent = `Target: ${targetObject.id} (${targetObject.type})`;
+                        targetOption.selected = true;
+                        objectSelect.appendChild(targetOption);
+                    } else {
+                        addToHistory('Target object not found', 'error');
+                    }
+                    
+                    // Add other objects to select
+                    allObjects.forEach(obj => {
+                        if (!targetObject || obj.id !== targetObject.id) {
+                            const option = document.createElement('option');
+                            option.value = obj.id;
+                            option.textContent = `${obj.id} (${obj.type || 'Unknown'})`;
+                            objectSelect.appendChild(option);
+                        }
+                    });
+                    
+                    updateApiStatus(true, `Found ${allObjects.length} objects`);
+                } catch (error) {
+                    addToHistory(`Error finding objects: ${error.message}`, 'error');
+                    updateApiStatus(false, 'Connection error');
+                }
+            }
+            
+            // Move in a direction
+            async function move(direction) {
+                const dir = directions[direction];
+                if (!dir) return;
+                
+                const increment = parseFloat(incrementInput.value) || 0.01;
+                
+                // Update local position
+                position[dir.axis] += dir.value * increment;
+                
+                // Update visualization
+                updateProbe();
+                
+                // Add to history
+                addToHistory(`Move ${dir.name}: ${dir.axis.toUpperCase()} ${dir.value > 0 ? '+' : ''}${dir.value * increment}`);
+                
+                // Update API if connected
+                await updateObjectInAPI();
+            }
+            
+            // Rotate in a direction
+            async function rotate(direction) {
+                const rot = rotations[direction];
+                if (!rot) return;
+                
+                const increment = parseFloat(rotationIncrementInput.value) || 15;
+                
+                // Update local rotation
+                rotation[rot.axis] += rot.value * increment;
+                
+                // Normalize rotation to 0-360
+                rotation[rot.axis] = (rotation[rot.axis] + 360) % 360;
+                
+                // Update visualization
+                updateProbe();
+                
+                // Add to history
+                addToHistory(`Rotate ${rot.name}: ${rot.axis.toUpperCase()} ${rot.value > 0 ? '+' : ''}${rot.value * increment}`);
+                
+                // Update API if connected
+                await updateObjectInAPI();
+            }
+            
+            // Reset position
+            async function resetPosition() {
+                position = { x: 0, y: 0, z: 0 };
+                updateProbe();
+                addToHistory('Position reset to origin');
+                
+                // Update API if connected
+                await updateObjectInAPI();
+            }
+            
+            // Reset rotation
+            async function resetRotation() {
+                rotation = { x: 0, y: 0, z: 0 };
+                updateProbe();
+                addToHistory('Rotation reset to zero');
+                
+                // Update API if connected
+                await updateObjectInAPI();
+            }
+            
+            // Update object in API
+            async function updateObjectInAPI() {
+                if (!apiToggle.checked || !apiConnected) {
+                    return;
+                }
+                
+                const selectedObjectId = objectSelect.value;
+                if (selectedObjectId === 'default') {
+                    addToHistory('No object selected for API update', 'error');
+                    return;
+                }
+                
+                try {
+                    // Find selected object
+                    const selectedObject = allObjects.find(obj => obj.id === selectedObjectId);
+                    if (!selectedObject) {
+                        addToHistory('Selected object not found', 'error');
+                        return;
+                    }
+                    
+                    // Update pose
+                    selectedObject.pose = {
+                        position: { ...position },
+                        rotation: { ...rotation }
                     };
-                    updateProbePosition();
+                    
+                    // Send update to API
+                    const response = await fetch(`${API_CONFIG.endpoint}/${selectedObjectId}`, {
+                        method: 'PUT',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify(selectedObject)
+                    });
+                    
+                    if (response.ok) {
+                        addToHistory(`Updated object ${selectedObjectId} in API`, 'success');
+                    } else {
+                        addToHistory(`API update error: ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    addToHistory(`Error updating API: ${error.message}`, 'error');
+                }
+            }
+            
+            // Change selected object
+            function changeSelectedObject() {
+                const selectedObjectId = objectSelect.value;
+                
+                if (selectedObjectId === 'default') {
+                    // Reset to default
+                    position = { x: 0, y: 0, z: 0 };
+                    rotation = { x: 0, y: 0, z: 0 };
+                    updateProbe();
+                    addToHistory('Switched to default object');
+                    return;
                 }
                 
-                addToHistory(`Found target object: ${targetObject.id}`, 'success');
-                
-                // Add target object to select
-                const targetOption = document.createElement('option');
-                targetOption.value = targetObject.id;
-                targetOption.textContent = `Target: ${targetObject.id} (${targetObject.type})`;
-                targetOption.selected = true;
-                objectSelect.appendChild(targetOption);
-            } else {
-                addToHistory('Target object not found', 'error');
-            }
-            
-            // Add other objects to select
-            allObjects.forEach(obj => {
-                if (!targetObject || obj.id !== targetObject.id) {
-                    const option = document.createElement('option');
-                    option.value = obj.id;
-                    option.textContent = `${obj.id} (${obj.type})`;
-                    objectSelect.appendChild(option);
+                // Find selected object
+                const selectedObject = allObjects.find(obj => obj.id === selectedObjectId);
+                if (!selectedObject) {
+                    addToHistory('Selected object not found', 'error');
+                    return;
                 }
-            });
-            
-            addToHistory(`Found ${allObjects.length} total objects`);
-            updateApiStatus(true, `Connected - ${allObjects.length} objects found`);
-            
-        } catch (error) {
-            addToHistory(`Error finding objects: ${error.message}`, 'error');
-            updateApiStatus(false, `Error: ${error.message}`);
-        }
-    }
-    
-    // Move probe via API
-    async function moveProbeViaApi(axis, value, position) {
-        if (!apiToggle.checked) {
-            return { success: false, message: 'API control is disabled' };
-        }
-        
-        if (!targetObject) {
-            return { success: false, message: 'No target object selected' };
-        }
-        
-        const anchorCode = getCurrentAnchorCode();
-        if (!anchorCode) {
-            return { success: false, message: 'No anchor code provided' };
-        }
-        
-        try {
-            // Create a deep copy of the target object
-            const updatedObject = JSON.parse(JSON.stringify(targetObject));
-            
-            // Ensure pose and position objects exist
-            if (!updatedObject.pose) updatedObject.pose = {};
-            if (!updatedObject.pose.position) updatedObject.pose.position = { x: 0, y: 0, z: 0 };
-            
-            // Update the specific axis
-            //updatedObject.pose.position[axis] = position[axis];
-            updatedObject.pose.position = position;
-
-            // Send update to API
-            const response = await fetch(`${API_CONFIG.endpoint}/${targetObject.id}`, {
-                method: 'PUT',
-                headers: getApiHeaders(),
-                body: JSON.stringify(updatedObject)
-            });
-            
-            if (!response.ok) {
-                throw new Error(`API error: ${response.status}`);
-            }
-            
-            // Try to parse response
-            try {
-                const result = await response.json();
-                return { success: true, message: 'Position updated via API', data: result };
-            } catch (parseError) {
-                return { success: true, message: 'Position updated (no response data)' };
-            }
-            
-        } catch (error) {
-            return { success: false, message: `API error: ${error.message}` };
-        }
-    }
-    
-    // Move probe (with optional API update)
-    async function moveProbe(direction) {
-        const dir = directions[direction];
-        if (!dir) return;
-        
-        // Get increment value
-        const increment = parseFloat(incrementInput.value) || 0.01;
-        
-        // Apply movement to local position
-        position[dir.axis] += dir.value * increment;
-        
-        // Constrain to reasonable range
-        position.x = Math.max(-5, Math.min(5, position.x));
-        position.y = Math.max(-5, Math.min(5, position.y));
-        position.z = Math.max(-5, Math.min(5, position.z));
-        
-        // Update visuals
-        updateProbePosition();
-        
-        // Add to history
-        addToHistory(`Moved ${dir.name}: ${dir.axis.toUpperCase()}${dir.value > 0 ? '+' : ''}${(dir.value * increment).toFixed(3)} to ${position.x},${position.y},${position.z}`);
-        
-        // Highlight button
-        const button = document.getElementById(direction);
-        if (button) {
-            button.style.backgroundColor = '#ff4757';
-            setTimeout(() => {
-                button.style.backgroundColor = '';
-            }, 200);
-        }
-        
-        // Update via API if enabled
-        if (apiToggle.checked) {
-            const result = await moveProbeViaApi(dir.axis, dir.value * increment, position);
-            
-            if (result.success) {
-                addToHistory(`API update successful: ${result.message}`, 'success');
-            } else {
-                addToHistory(`API update failed: ${result.message}`, 'error');
-            }
-        }
-    }
-    
-    // Reset probe position
-    async function resetProbe() {
-        position = { x: -0.5, y: 1.2, z: 0 };
-        updateProbePosition();
-        addToHistory(`POSITION RESET TO: ${position.x}, ${position.y}, ${position.z}`);
-        
-        // Highlight button
-        const button = document.getElementById('center');
-        if (button) {
-            button.style.backgroundColor = '#ff4757';
-            setTimeout(() => {
-                button.style.backgroundColor = '';
-            }, 200);
-        }
-        
-        // Reset via API if enabled
-        if (apiToggle.checked && targetObject) {
-            const anchorCode = getCurrentAnchorCode();
-            if (!anchorCode) {
-                addToHistory('API reset failed: No anchor code provided', 'error');
-                return;
-            }
-            
-            try {
-                // Create a deep copy of the target object
-                const updatedObject = JSON.parse(JSON.stringify(targetObject));
                 
-                // Reset position
-                if (!updatedObject.pose) updatedObject.pose = {};
-                updatedObject.pose.position = position;
+                // Update position and rotation from selected object
+                if (selectedObject.pose) {
+                    if (selectedObject.pose.position) {
+                        position = {
+                            x: selectedObject.pose.position.x || 0,
+                            y: selectedObject.pose.position.y || 0,
+                            z: selectedObject.pose.position.z || 0
+                        };
+                    } else {
+                        position = { x: 0, y: 0, z: 0 };
+                    }
+                    
+                    if (selectedObject.pose.rotation) {
+                        rotation = {
+                            x: selectedObject.pose.rotation.x || 0,
+                            y: selectedObject.pose.rotation.y || 0,
+                            z: selectedObject.pose.rotation.z || 0
+                        };
+                    } else {
+                        rotation = { x: 0, y: 0, z: 0 };
+                    }
+                } else {
+                    position = { x: 0, y: 0, z: 0 };
+                    rotation = { x: 0, y: 0, z: 0 };
+                }
                 
-                // Send update to API
-                const response = await fetch(`${API_CONFIG.endpoint}/${targetObject.id}`, {
-                    method: 'PUT',
-                    headers: getApiHeaders(),
-                    body: JSON.stringify(updatedObject)
+                updateProbe();
+                addToHistory(`Switched to object: ${selectedObjectId}`);
+            }
+            
+            // Initialize events
+            function initEvents() {
+                // Movement buttons
+                document.getElementById('up').addEventListener('click', () => move('up'));
+                document.getElementById('down').addEventListener('click', () => move('down'));
+                document.getElementById('left').addEventListener('click', () => move('left'));
+                document.getElementById('right').addEventListener('click', () => move('right'));
+                document.getElementById('forward').addEventListener('click', () => move('forward'));
+                document.getElementById('backward').addEventListener('click', () => move('backward'));
+                document.getElementById('center').addEventListener('click', resetPosition);
+                
+                // Rotation buttons
+                document.getElementById('rotateXPlus').addEventListener('click', () => rotate('rotateXPlus'));
+                document.getElementById('rotateXMinus').addEventListener('click', () => rotate('rotateXMinus'));
+                document.getElementById('rotateYPlus').addEventListener('click', () => rotate('rotateYPlus'));
+                document.getElementById('rotateYMinus').addEventListener('click', () => rotate('rotateYMinus'));
+                document.getElementById('rotateZPlus').addEventListener('click', () => rotate('rotateZPlus'));
+                document.getElementById('rotateZMinus').addEventListener('click', () => rotate('rotateZMinus'));
+                document.getElementById('resetRotation').addEventListener('click', resetRotation);
+                
+                // API controls
+                findObjectsBtn.addEventListener('click', findObjects);
+                apiToggle.addEventListener('change', checkApiConnection);
+                objectSelect.addEventListener('change', changeSelectedObject);
+                
+                // Keyboard controls
+                document.addEventListener('keydown', function(event) {
+                    // Movement keys
+                    switch(event.key) {
+                        case 'ArrowUp':
+                            move('up');
+                            event.preventDefault();
+                            break;
+                        case 'ArrowDown':
+                            move('down');
+                            event.preventDefault();
+                            break;
+                        case 'ArrowLeft':
+                            move('left');
+                            event.preventDefault();
+                            break;
+                        case 'ArrowRight':
+                            move('right');
+                            event.preventDefault();
+                            break;
+                        case 'PageUp':
+                            move('forward');
+                            event.preventDefault();
+                            break;
+                        case 'PageDown':
+                            move('backward');
+                            event.preventDefault();
+                            break;
+                        case 'Home':
+                            resetPosition();
+                            event.preventDefault();
+                            break;
+                        // Rotation keys
+                        case 'w':
+                        case 'W':
+                            rotate('rotateXPlus');
+                            break;
+                        case 's':
+                        case 'S':
+                            rotate('rotateXMinus');
+                            break;
+                        case 'a':
+                        case 'A':
+                            rotate('rotateYMinus');
+                            break;
+                        case 'd':
+                        case 'D':
+                            rotate('rotateYPlus');
+                            break;
+                        case 'q':
+                        case 'Q':
+                            rotate('rotateZMinus');
+                            break;
+                        case 'e':
+                        case 'E':
+                            rotate('rotateZPlus');
+                            break;
+                        case 'r':
+                        case 'R':
+                            resetRotation();
+                            break;
+                    }
                 });
                 
-                if (!response.ok) {
-                    throw new Error(`API error: ${response.status}`);
-                }
-                
-                addToHistory('API position reset successful', 'success');
-                
-            } catch (error) {
-                addToHistory(`API reset failed: ${error.message}`, 'error');
+                // Anchor code input change
+                anchorCodeInput.addEventListener('change', checkApiConnection);
             }
-        }
-    }
-    
-    // Handle object selection change
-    function handleObjectSelectChange() {
-        const selectedId = objectSelect.value;
-        
-        if (selectedId === 'default') {
-            // Keep using the default target
-            return;
-        }
-        
-        // Find the selected object
-        const selected = allObjects.find(obj => obj.id === selectedId);
-        
-        if (selected) {
-            targetObject = selected;
-            addToHistory(`Selected object: ${targetObject.id}`);
             
-            // Update position if available
-            if (targetObject.pose && targetObject.pose.position) {
-                position = {
-                    x: targetObject.pose.position.x,
-                    y: targetObject.pose.position.y,
-                    z: targetObject.pose.position.z
-                };
-                updateProbePosition();
-                addToHistory('Updated position from selected object');
-            }
-        }
-    }
-    
-    // Handle anchor code input change
-    function handleAnchorCodeChange() {
-        const anchorCode = getCurrentAnchorCode();
-        if (anchorCode) {
-            addToHistory(`Anchor code set to: ${anchorCode}`);
-            if (apiConnected) {
-                // If already connected, recheck the connection with new anchor code
+            // Initialize the controller
+            function init() {
+                addToHistory('3D Probe Controller initialized');
+                initEvents();
                 checkApiConnection();
             }
-        } else {
-            addToHistory('Anchor code cleared', 'error');
-            updateApiStatus(false, 'No anchor code provided');
-        }
-    }
-    
-    // Button event listeners
-    Object.keys(directions).forEach(direction => {
-        const button = document.getElementById(direction);
-        if (button) {
-            button.addEventListener('click', () => moveProbe(direction));
-        }
-    });
-    
-    // Reset button
-    document.getElementById('center').addEventListener('click', resetProbe);
-    
-    // Find objects button
-    findObjectsBtn.addEventListener('click', findObjects);
-    
-    // Object select change
-    objectSelect.addEventListener('change', handleObjectSelectChange);
-    
-    // Anchor code input change
-    anchorCodeInput.addEventListener('change', handleAnchorCodeChange);
-    anchorCodeInput.addEventListener('blur', handleAnchorCodeChange);
-    
-    // API toggle
-    apiToggle.addEventListener('change', function() {
-        if (this.checked) {
-            checkApiConnection();
-            addToHistory('API control enabled');
-        } else {
-            updateApiStatus(false, 'API control disabled');
-            addToHistory('API control disabled');
-        }
-    });
-    
-    // Keyboard controls
-    document.addEventListener('keydown', function(event) {
-        switch(event.key) {
-            case 'ArrowUp':
-                moveProbe('up');
-                break;
-            case 'ArrowDown':
-                moveProbe('down');
-                break;
-            case 'ArrowLeft':
-                moveProbe('left');
-                break;
-            case 'ArrowRight':
-                moveProbe('right');
-                break;
-            case 'PageUp':
-                moveProbe('forward');
-                break;
-            case 'PageDown':
-                moveProbe('backward');
-                break;
-            case 'Home':
-                resetProbe();
-                break;
-        }
-    });
-    
-    // Initialize
-    addToHistory('3D Probe Controller initialized');
-    
-    // Initial check for anchor code
-    const initialAnchorCode = getCurrentAnchorCode();
-    if (initialAnchorCode) {
-        addToHistory(`Initial anchor code: ${initialAnchorCode}`);
-    } else {
-        addToHistory('Please enter an anchor code', 'error');
-    }
-    
-    // Check API connection
-    setTimeout(async () => {
-        const connected = await checkApiConnection();
-        if (connected) {
-            findObjects();  // Automatically find objects if connected
-        }
-    }, 500);
-});
-
+            
+            // Start the controller
+            init();
+        });
     </script>
 </body>
 </html>
+                
