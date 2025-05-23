@@ -36,7 +36,7 @@
         }
         
         .position-display {
-            display: flex;
+            display: none;
             justify-content: space-around;
             margin: 20px 0;
             flex-wrap: wrap;
@@ -487,6 +487,41 @@
             padding: 8px;
             border-radius: 4px;
             border: 1px solid #ddd;
+            display: none;
+        }
+        
+        .object-selector label {
+            display: none;
+        }
+        
+        .sync-btn {
+            padding: 8px 12px;
+            background-color: #ffc107;
+            color: #212529;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        
+        .sync-btn:hover {
+            background-color: #e0a800;
+        }
+        
+        .toggle-positions-btn {
+            padding: 8px 12px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        
+        .toggle-positions-btn:hover {
+            background-color: #5a6268;
         }
     </style>
 </head>
@@ -520,6 +555,8 @@
             <select id="objectSelect">
                 <option value="default">Default Target Object</option>
             </select>
+            <button id="syncPosition" class="sync-btn">Sync Position</button>
+            <button id="togglePositions" class="toggle-positions-btn">Show Positions</button>
         </div>
         
         <div class="visualization">
@@ -653,11 +690,15 @@
             const findObjectsBtn = document.getElementById('findObjects');
             const objectSelect = document.getElementById('objectSelect');
             const anchorCodeInput = document.getElementById('my-textbox');
+            const syncPositionBtn = document.getElementById('syncPosition');
+            const togglePositionsBtn = document.getElementById('togglePositions');
+            const positionDisplay = document.querySelector('.position-display');
             
             // API state
             let apiConnected = false;
             let targetObject = null;
             let allObjects = [];
+            let currentObjectId = null; // Track the current object ID for syncing
             
             // Current position and rotation
             let position = {
@@ -738,12 +779,12 @@
             
             // Update probe position and rotation in visualization
             function updateProbe() {
-                // Update position values display
+                // Update position values display (if visible)
                 xPosition.textContent = position.x.toFixed(3);
                 yPosition.textContent = position.y.toFixed(3);
                 zPosition.textContent = position.z.toFixed(3);
                 
-                // Update rotation values display
+                // Update rotation values display (if visible)
                 xRotation.textContent = rotation.x.toFixed(3);
                 yRotation.textContent = rotation.y.toFixed(3);
                 zRotation.textContent = rotation.z.toFixed(3);
@@ -789,21 +830,84 @@
                     return false;
                 }
                 
+                addToHistory(`Checking API connection with anchor code: ${anchorCode}...`);
+                
                 try {
                     const response = await fetch(API_CONFIG.endpoint, {
                         method: 'GET',
                         headers: getApiHeaders()
                     });
                     
+                    addToHistory(`API response status: ${response.status}`);
+                    
                     if (response.ok) {
                         updateApiStatus(true, 'Connected to API');
+                        addToHistory('API connection successful', 'success');
                         return true;
                     } else {
                         updateApiStatus(false, `API error: ${response.status}`);
+                        addToHistory(`API connection failed: ${response.status}`, 'error');
                         return false;
                     }
                 } catch (error) {
                     updateApiStatus(false, `Connection error: ${error.message}`);
+                    addToHistory(`Connection error: ${error.message}`, 'error');
+                    return false;
+                }
+            }
+            
+            // Sync position from API
+            async function syncPositionFromAPI() {
+                if (!apiToggle.checked || !apiConnected) {
+                    addToHistory('Cannot sync - API not connected', 'error');
+                    return false;
+                }
+                
+                const selectedObjectId = objectSelect.value;
+                if (selectedObjectId === 'default') {
+                    addToHistory('Cannot sync - no object selected', 'error');
+                    return false;
+                }
+                
+                try {
+                    addToHistory(`Syncing position and rotation from API for object: ${selectedObjectId}`);
+                    
+                    const response = await fetch(`${API_CONFIG.endpoint}/${selectedObjectId}`, {
+                        method: 'GET',
+                        headers: getApiHeaders()
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API error: ${response.status}`);
+                    }
+                    
+                    const objectData = await response.json();
+                    
+                    // Update local position and rotation from API data
+                    if (objectData.pose) {
+                        if (objectData.pose.position) {
+                            position = {
+                                x: objectData.pose.position.x || 0,
+                                y: objectData.pose.position.y || 0,
+                                z: objectData.pose.position.z || 0
+                            };
+                        }
+                        
+                        if (objectData.pose.rotation) {
+                            rotation = {
+                                x: objectData.pose.rotation.x || 0,
+                                y: objectData.pose.rotation.y || 0,
+                                z: objectData.pose.rotation.z || 0
+                            };
+                        }
+                    }
+                    
+                    updateProbe();
+                    addToHistory(`Position and rotation synced - Pos: X=${position.x.toFixed(3)}, Y=${position.y.toFixed(3)}, Z=${position.z.toFixed(3)} Rot: X=${rotation.x.toFixed(3)}, Y=${rotation.y.toFixed(3)}, Z=${rotation.z.toFixed(3)}`, 'success');
+                    return true;
+                    
+                } catch (error) {
+                    addToHistory(`Error syncing position: ${error.message}`, 'error');
                     return false;
                 }
             }
@@ -829,11 +933,51 @@
                         headers: getApiHeaders()
                     });
                     
+                    addToHistory(`Find objects response status: ${response.status}`);
+                    
                     if (!response.ok) {
                         throw new Error(`API error: ${response.status}`);
                     }
                     
-                    allObjects = await response.json();
+                    const responseText = await response.text();
+                    addToHistory(`API response length: ${responseText.length} characters`);
+                    
+                    // Try to parse JSON
+                    let parsedObjects;
+                    try {
+                        parsedObjects = JSON.parse(responseText);
+                    } catch (parseError) {
+                        addToHistory(`JSON parse error: ${parseError.message}`, 'error');
+                        addToHistory(`Response preview: ${responseText.substring(0, 200)}...`, 'error');
+                        return;
+                    }
+                    
+                    // Handle different response formats
+                    if (Array.isArray(parsedObjects)) {
+                        allObjects = parsedObjects;
+                    } else if (parsedObjects && typeof parsedObjects === 'object') {
+                        // If response is an object, check for common array properties
+                        if (parsedObjects.objects && Array.isArray(parsedObjects.objects)) {
+                            allObjects = parsedObjects.objects;
+                        } else if (parsedObjects.items && Array.isArray(parsedObjects.items)) {
+                            allObjects = parsedObjects.items;
+                        } else if (parsedObjects.data && Array.isArray(parsedObjects.data)) {
+                            allObjects = parsedObjects.data;
+                        } else {
+                            // Single object response
+                            allObjects = [parsedObjects];
+                        }
+                    } else {
+                        addToHistory('Unexpected API response format', 'error');
+                        return;
+                    }
+                    
+                    addToHistory(`Found ${allObjects.length} objects total`);
+                    
+                    // Log object details for debugging
+                    allObjects.forEach((obj, index) => {
+                        addToHistory(`Object ${index}: ID=${obj.id || 'N/A'}, Type=${obj.type || 'N/A'}, Source=${obj.source ? obj.source.substring(0, 50) + '...' : 'N/A'}`);
+                    });
                     
                     // Clear select options
                     objectSelect.innerHTML = '';
@@ -844,43 +988,71 @@
                     defaultOption.textContent = 'Default Target Object';
                     objectSelect.appendChild(defaultOption);
                     
+                    if (allObjects.length === 0) {
+                        addToHistory('No objects returned from API', 'error');
+                        currentObjectId = null;
+                        updateApiStatus(true, 'Connected - No objects found');
+                        return;
+                    }
+                    
                     // Find target object by source
                     const targetObjects = allObjects.filter(obj => 
                         obj.source === API_CONFIG.targetObjectSource
                     );
                     
                     if (targetObjects.length > 0) {
+                        // Found the specific target object
                         targetObject = targetObjects[0];
-                        // Update position and rotation from target object
-                        if (targetObject.pose) {
-                            if (targetObject.pose.position) {
-                                position = {
-                                    x: targetObject.pose.position.x,
-                                    y: targetObject.pose.position.y,
-                                    z: targetObject.pose.position.z
-                                };
-                            }
-                            if (targetObject.pose.rotation) {
-                                rotation = {
-                                    x: targetObject.pose.rotation.x || 0,
-                                    y: targetObject.pose.rotation.y || 0,
-                                    z: targetObject.pose.rotation.z || 0
-                                };
-                            }
-                            updateProbe();
-                        }
-                        
+                        currentObjectId = targetObject.id;
                         addToHistory(`Found target object: ${targetObject.id}`, 'success');
-                        
-                        // Add target object to select
-                        const targetOption = document.createElement('option');
-                        targetOption.value = targetObject.id;
-                        targetOption.textContent = `Target: ${targetObject.id} (${targetObject.type})`;
-                        targetOption.selected = true;
-                        objectSelect.appendChild(targetOption);
+                    } else if (allObjects.length > 0) {
+                        // No specific target found, use the first available object
+                        targetObject = allObjects[0];
+                        currentObjectId = targetObject.id;
+                        addToHistory(`Target object not found, using first available: ${targetObject.id}`, 'success');
                     } else {
-                        addToHistory('Target object not found', 'error');
+                        addToHistory('No objects found', 'error');
+                        currentObjectId = null;
+                        updateApiStatus(true, `Found 0 objects`);
+                        return;
                     }
+                    
+                    addToHistory(`Selected object ID: ${currentObjectId}`);
+                    
+                    // Update position and rotation from selected object
+                    if (targetObject.pose) {
+                        addToHistory('Object has pose data');
+                        if (targetObject.pose.position) {
+                            position = {
+                                x: targetObject.pose.position.x || 0,
+                                y: targetObject.pose.position.y || 0,
+                                z: targetObject.pose.position.z || 0
+                            };
+                            addToHistory(`Initial position: X=${position.x}, Y=${position.y}, Z=${position.z}`);
+                        }
+                        if (targetObject.pose.rotation) {
+                            rotation = {
+                                x: targetObject.pose.rotation.x || 0,
+                                y: targetObject.pose.rotation.y || 0,
+                                z: targetObject.pose.rotation.z || 0
+                            };
+                            addToHistory(`Initial rotation: X=${rotation.x}, Y=${rotation.y}, Z=${rotation.z}`);
+                        }
+                        updateProbe();
+                    } else {
+                        // Initialize with default position if no pose data
+                        addToHistory('Object has no pose data, using defaults');
+                        position = { x: 0, y: 0, z: 0 };
+                        rotation = { x: 0, y: 0, z: 0 };
+                        updateProbe();
+                    }
+                    
+                    // Add target object to select (for backward compatibility)
+                    const targetOption = document.createElement('option');
+                    targetOption.value = targetObject.id;
+                    targetOption.textContent = `Target: ${targetObject.id} (${targetObject.type || 'Unknown'})`;
+                    targetOption.selected = true;
+                    objectSelect.appendChild(targetOption);
                     
                     // Add other objects to select
                     allObjects.forEach(obj => {
@@ -892,10 +1064,13 @@
                         }
                     });
                     
-                    updateApiStatus(true, `Found ${allObjects.length} objects`);
+                    updateApiStatus(true, `Found ${allObjects.length} objects - Using: ${currentObjectId}`);
+                    addToHistory('Object selection complete', 'success');
+                    
                 } catch (error) {
                     addToHistory(`Error finding objects: ${error.message}`, 'error');
                     updateApiStatus(false, 'Connection error');
+                    currentObjectId = null;
                 }
             }
             
@@ -904,16 +1079,25 @@
                 const dir = directions[direction];
                 if (!dir) return;
                 
+                // Sync position from API before moving if API is connected and we have an object
+                if (apiToggle.checked && apiConnected && currentObjectId) {
+                    const syncSuccess = await syncPositionFromAPI();
+                    if (!syncSuccess) {
+                        addToHistory('Warning: Could not sync position before movement', 'error');
+                    }
+                }
+                
                 const increment = parseFloat(incrementInput.value) || 0.01;
                 
-                // Update local position
+                // Update ONLY the position, don't change rotation
+                const oldPosition = {...position};
                 position[dir.axis] += dir.value * increment;
                 
                 // Update visualization
                 updateProbe();
                 
                 // Add to history
-                addToHistory(`Move ${dir.name}: ${dir.axis.toUpperCase()} ${dir.value > 0 ? '+' : ''}${dir.value * increment}`);
+                addToHistory(`Move ${dir.name}: ${dir.axis.toUpperCase()} ${oldPosition[dir.axis].toFixed(3)} → ${position[dir.axis].toFixed(3)}`);
                 
                 // Update API if connected
                 await updateObjectInAPI();
@@ -923,6 +1107,14 @@
             async function rotate(direction) {
                 const rot = rotations[direction];
                 if (!rot) return;
+                
+                // Sync position from API before rotating if API is connected and we have an object
+                if (apiToggle.checked && apiConnected && currentObjectId) {
+                    const syncSuccess = await syncPositionFromAPI();
+                    if (!syncSuccess) {
+                        addToHistory('Warning: Could not sync position before rotation', 'error');
+                    }
+                }
                 
                 const increment = parseFloat(rotationIncrementInput.value) || 15;
                 
@@ -968,9 +1160,9 @@
                     return;
                 }
                 
-                const selectedObjectId = objectSelect.value;
-                if (selectedObjectId === 'default') {
-                    addToHistory('No object selected for API update', 'error');
+                // Use currentObjectId if available, otherwise fall back to select value
+                const selectedObjectId = currentObjectId || objectSelect.value;
+                if (!selectedObjectId || selectedObjectId === 'default') {
                     return;
                 }
                 
@@ -1002,6 +1194,21 @@
                     }
                 } catch (error) {
                     addToHistory(`Error updating API: ${error.message}`, 'error');
+                }
+            }
+            
+            // Toggle position display visibility
+            function togglePositionDisplay() {
+                const isVisible = positionDisplay.style.display === 'flex';
+                
+                if (isVisible) {
+                    positionDisplay.style.display = 'none';
+                    togglePositionsBtn.textContent = 'Show Positions';
+                    addToHistory('Position displays hidden');
+                } else {
+                    positionDisplay.style.display = 'flex';
+                    togglePositionsBtn.textContent = 'Hide Positions';
+                    addToHistory('Position displays shown');
                 }
             }
             
@@ -1079,6 +1286,8 @@
                 findObjectsBtn.addEventListener('click', findObjects);
                 apiToggle.addEventListener('change', checkApiConnection);
                 objectSelect.addEventListener('change', changeSelectedObject);
+                syncPositionBtn.addEventListener('click', syncPositionFromAPI);
+                togglePositionsBtn.addEventListener('click', togglePositionDisplay);
                 
                 // Keyboard controls
                 document.addEventListener('keydown', function(event) {
@@ -1152,7 +1361,16 @@
             function init() {
                 addToHistory('3D Probe Controller initialized');
                 initEvents();
-                checkApiConnection();
+                
+                // Check connection first
+                checkApiConnection().then(connected => {
+                    if (connected) {
+                        addToHistory('API connection established, searching for objects...');
+                        findObjects();
+                    } else {
+                        addToHistory('API connection failed - check anchor code and try again', 'error');
+                    }
+                });
             }
             
             // Start the controller
@@ -1161,4 +1379,3 @@
     </script>
 </body>
 </html>
-                
