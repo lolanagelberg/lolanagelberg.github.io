@@ -708,7 +708,7 @@
                 z: 0
             };
             
-            let rotation = {
+            let eulerRotation = {
                 x: 0, // pitch
                 y: 0, // yaw
                 z: 0  // roll
@@ -786,9 +786,9 @@
                 zPosition.textContent = position.z.toFixed(3);
                 
                 // Update rotation values display (if visible)
-                xRotation.textContent = rotation.x.toFixed(3);
-                yRotation.textContent = rotation.y.toFixed(3);
-                zRotation.textContent = rotation.z.toFixed(3);
+                xRotation.textContent = eulerRotation.x.toFixed(3);
+                yRotation.textContent = eulerRotation.y.toFixed(3);
+                zRotation.textContent = eulerRotation.z.toFixed(3);
                 
                 // Calculate visual position (mapping 3D space to the visualization)
                 const visualX = 50 + position.x * 500; // Center is 50%, multiplier for visual effect
@@ -799,9 +799,9 @@
                 const scale = 1 + position.z * 0.5;
                 
                 // Convert rotation degrees to radians
-                const rotX = rotation.x * Math.PI / 180;
-                const rotY = rotation.y * Math.PI / 180;
-                const rotZ = rotation.z * Math.PI / 180;
+                const rotX = eulerRotation.x * Math.PI / 180;
+                const rotY = eulerRotation.y * Math.PI / 180;
+                const rotZ = eulerRotation.z * Math.PI / 180;
                 
                 // Apply transformations (position and rotation)
                 probe.style.left = `${visualX}%`;
@@ -894,17 +894,17 @@
                             };
                         }
                         
-                        if (objectData.pose.rotation) {
-                            rotation = {
-                                x: objectData.pose.rotation.x || 0,
-                                y: objectData.pose.rotation.y || 0,
-                                z: objectData.pose.rotation.z || 0
+                        if (objectData.pose.eulerRotation) {
+                            eulerRotation = {
+                                x: parseFloat(objectData.pose.eulerRotation.x) || 0,
+                                y: parseFloat(objectData.pose.eulerRotation.y) || 0,
+                                z: parseFloat(objectData.pose.eulerRotation.z) || 0
                             };
                         }
                     }
                     
                     updateProbe();
-                    addToHistory(`Position and rotation synced - Pos: X=${position.x.toFixed(3)}, Y=${position.y.toFixed(3)}, Z=${position.z.toFixed(3)} Rot: X=${rotation.x.toFixed(3)}, Y=${rotation.y.toFixed(3)}, Z=${rotation.z.toFixed(3)}`, 'success');
+                    addToHistory(`Position and rotation synced - Pos: X=${position.x.toFixed(3)}, Y=${position.y.toFixed(3)}, Z=${position.z.toFixed(3)} Rot: X=${eulerRotation.x.toFixed(3)}, Y=${eulerRotation.y.toFixed(3)}, Z=${eulerRotation.z.toFixed(3)}`, 'success');
                     return true;
                     
                 } catch (error) {
@@ -1031,20 +1031,20 @@
                             };
                             addToHistory(`Initial position: X=${position.x}, Y=${position.y}, Z=${position.z}`);
                         }
-                        if (targetObject.pose.rotation) {
-                            rotation = {
-                                x: targetObject.pose.rotation.x || 0,
-                                y: targetObject.pose.rotation.y || 0,
-                                z: targetObject.pose.rotation.z || 0
+                        if (targetObject.pose.eulerRotation) {
+                            eulerRotation = {
+                                x: parseFloat(targetObject.pose.eulerRotation.x) || 0,
+                                y: parseFloat(targetObject.pose.eulerRotation.y) || 0,
+                                z: parseFloat(targetObject.pose.eulerRotation.z) || 0
                             };
-                            addToHistory(`Initial rotation: X=${rotation.x}, Y=${rotation.y}, Z=${rotation.z}`);
+                            addToHistory(`Initial rotation: X=${eulerRotation.x}, Y=${eulerRotation.y}, Z=${eulerRotation.z}`);
                         }
                         updateProbe();
                     } else {
                         // Initialize with default position if no pose data
                         addToHistory('Object has no pose data, using defaults');
                         position = { x: 0, y: 0, z: 0 };
-                        rotation = { x: 0, y: 0, z: 0 };
+                        eulerRotation = { x: 0, y: 0, z: 0 };
                         updateProbe();
                     }
                     
@@ -1120,10 +1120,10 @@
                 const increment = parseFloat(rotationIncrementInput.value) || 15;
                 
                 // Update local rotation
-                rotation[rot.axis] += rot.value * increment;
+                eulerRotation[rot.axis] += rot.value * increment;
                 
                 // Normalize rotation to 0-360
-                rotation[rot.axis] = (rotation[rot.axis] + 360) % 360;
+                eulerRotation[rot.axis] = (eulerRotation[rot.axis] + 360) % 360;
                 
                 // Update visualization
                 updateProbe();
@@ -1147,7 +1147,7 @@
             
             // Reset rotation
             async function resetRotation() {
-                rotation = { x: 0, y: 0, z: 0 };
+                eulerRotation = { x: 0, y: 0, z: 0 };
                 updateProbe();
                 addToHistory('Rotation reset to zero');
                 
@@ -1178,7 +1178,7 @@
                     // Update pose
                     selectedObject.pose = {
                         position: { ...position },
-                        rotation: { ...rotation }
+                        eulerRotation: { ...eulerRotation }
                     };
                     
                     // Send update to API
@@ -1220,7 +1220,7 @@
                 if (selectedObjectId === 'default') {
                     // Reset to default
                     position = { x: 0, y: 0, z: 0 };
-                    rotation = { x: 0, y: 0, z: 0 };
+                    eulerRotation = { x: 0, y: 0, z: 0 };
                     updateProbe();
                     addToHistory('Switched to default object');
                     return;
@@ -1245,18 +1245,18 @@
                         position = { x: 0, y: 0, z: 0 };
                     }
                     
-                    if (selectedObject.pose.rotation) {
-                        rotation = {
-                            x: selectedObject.pose.rotation.x || 0,
-                            y: selectedObject.pose.rotation.y || 0,
-                            z: selectedObject.pose.rotation.z || 0
+                    if (selectedObject.pose.rotation) {  // Note: this should be eulerRotation, not rotation
+                        eulerRotation = {
+                            x: parseFloat(selectedObject.pose.eulerRotation.x) || 0,
+                            y: parseFloat(selectedObject.pose.eulerRotation.y) || 0,
+                            z: parseFloat(selectedObject.pose.eulerRotation.z) || 0
                         };
                     } else {
-                        rotation = { x: 0, y: 0, z: 0 };
+                        eulerRotation = { x: 0, y: 0, z: 0 };
                     }
                 } else {
                     position = { x: 0, y: 0, z: 0 };
-                    rotation = { x: 0, y: 0, z: 0 };
+                    eulerRotation = { x: 0, y: 0, z: 0 };
                 }
                 
                 updateProbe();
