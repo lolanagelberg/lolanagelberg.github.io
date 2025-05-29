@@ -1137,7 +1137,7 @@
             
             // Reset position
             async function resetPosition() {
-                position = { x: 0, y: 0, z: 0 };
+                position = { x: 0, y: 1.3, z: 0 };
                 updateProbe();
                 addToHistory('Position reset to origin');
                 
@@ -1219,7 +1219,7 @@
                 
                 if (selectedObjectId === 'default') {
                     // Reset to default
-                    position = { x: 0, y: 0, z: 0 };
+                    position = { x: 0, y: 1.3, z: 0 };
                     eulerRotation = { x: 0, y: 0, z: 0 };
                     updateProbe();
                     addToHistory('Switched to default object');
